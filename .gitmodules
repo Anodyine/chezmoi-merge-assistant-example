@@ -1,3 +1,6 @@
 [submodule "tools/merge"]
 	path = tools/merge
 	url = https://github.com/anodyine/chezmoi-dotfiles-merge-assistant.git
+[submodule ".external_sources/dotfiles"]
+	path = .external_sources/dotfiles
+	url = https://github.com/mylinuxforwork/dotfiles.git
