@@ -1,0 +1,3 @@
+[submodule "tools/merge"]
+	path = tools/merge
+	url = https://github.com/anodyine/chezmoi-dotfiles-merge-assistant.git
