@@ -28,7 +28,7 @@ window#waybar {
     border: 1px solid transparent;	
     opacity:0.8;
     padding:0px;
-    margin:10px;
+    margin:2px;
     box-shadow: 0 0 6 @shadow;
 }
 
@@ -40,7 +40,7 @@ window#waybar {
     border: 1px solid transparent;	
     opacity:0.8;
     padding:0px;
-    margin:10px;
+    margin:2px;
     box-shadow: 0 0 6 @shadow;
 }
 
@@ -51,7 +51,7 @@ window#waybar {
         linear-gradient(@primary,@on_primary) border-box;
     border: 1px solid transparent;	
     opacity:0.8;
-    margin:10px;
+    margin:2px;
     box-shadow: 0 0 6 @shadow;
 }
 
