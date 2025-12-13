@@ -5,7 +5,7 @@ echo "[$(date)] Script started" >> "$LOGFILE"
 
 sleep 10
 
-QT_QPA_PLATFORM=xcb QT_WAYLAND_DISABLE=1 /usr/bin/synology-drive "$@" >>"$LOGFILE" 2>&1 &
+QT_QPA_PLATFORM=xcb /usr/bin/synology-drive "$@" >>"$LOGFILE" 2>&1 &
 
 sleep 5
 
