@@ -1,0 +1,7 @@
+{{ if eq .chezmoi.hostname "arch-lenovo" -}}
+    source = ~/.config/hypr/conf/monitors/left_desk.conf
+{{ else if eq .chezmoi.hostname "ml-server-2" -}}
+    source = ~/.config/hypr/conf/monitors/dance_room.conf
+{{ else -}}
+    source = ~/.config/hypr/conf/monitors/default.conf
+{{ end }}
