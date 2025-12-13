@@ -344,6 +344,7 @@
     "ntp": true,
     "packages": [
         "kitty",
+        "chezmoi",
         "git",
         "firefox",
         "blueman",
