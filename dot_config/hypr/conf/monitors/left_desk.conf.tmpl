@@ -1,11 +1,11 @@
 {{ if eq .chezmoi.hostname "arch-lenovo" -}}
     # Laptop internal display(s)
-    monitor=eDP-1,2560x1600@60,0x0,1.666667
-    monitor=eDP-2,2560x1600@60,0x0,1.666667
+    monitor=eDP-1,2560x1600@120,0x0,1.666667
+    monitor=eDP-2,2560x1600@120,0x0,1.666667
 
     # LG Ultragear (3440 wide) - Matches "LG Electronics LG ULTRAGEAR..."
-    monitor=desc:LG Electronics LG ULTRAGEAR,3440x1440@60,1996x-1352,1.25
+    monitor=desc:LG Electronics LG ULTRAGEAR,3440x1440@100,1996x-1352,1.25
 
     # Samsung Odyssey G9 (5120 wide) - Matches "Samsung Electric Company Odyssey G95C..."
-    monitor=desc:Samsung Electric Company Odyssey G95C,5120x1440@60,1536x-200,1.25
+    monitor=desc:Samsung Electric Company Odyssey G95C,5120x1440@240,1536x-200,1.25
 {{ end }}
