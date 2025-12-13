@@ -11,13 +11,14 @@
 
 /* ---- Configuration ---- */
 configuration {
-    modi:                       "drun,filebrowser,window,run";
+    modi:                       "drun,filebrowser,window,run,calc";
     font:                       "Fira Sans 11";
     show-icons:                 true;
     display-drun:                " ";
     display-run:                 " ";
     display-filebrowser:         "";
     display-window:              "";
+    display-calc:              "+/-";
 	drun-display-format:        "{name}";
     hover-select:               false;
     scroll-method:              1;
