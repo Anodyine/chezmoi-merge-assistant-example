@@ -57,7 +57,6 @@ button:hover {
 	background-color: alpha(@primary, 0.6);
     background-size: 28%;
 	border: 0px;
-    color: @on_primary;
 	margin: 10px;
 	box-shadow: 0 0 50px @shadow;
 }
