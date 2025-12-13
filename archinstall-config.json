@@ -351,6 +351,7 @@
         "pavucontrol",
         "grub-btrfs",
         "snapper",
+        "github-cli",
         "inotify-tools"
     ],
     "parallel_downloads": 0,
