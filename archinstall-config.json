@@ -10,7 +10,7 @@
     "archinstall-language": "English",
     "auth_config": {},
     "bootloader_config": {
-        "bootloader": "Grub",
+        "bootloader": "Limine",
         "removable": false,
         "uki": false
     },
@@ -349,8 +349,9 @@
         "firefox",
         "blueman",
         "pavucontrol",
-        "grub-btrfs",
+        "limine",
         "snapper",
+        "snap-pac",
         "github-cli",
         "inotify-tools"
     ],
