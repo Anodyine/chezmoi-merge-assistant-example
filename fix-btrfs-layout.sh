@@ -3,35 +3,42 @@ set -e
 
 echo ">> [Fixer] STARTING..."
 
-# 1. Set Default Subvolume to 5
+# 1. Set Default Subvolume to 5 (Crucial for rollbacks)
 btrfs subvolume set-default 5 /
 echo "   Default subvolume set to 5."
 
-# 2. Get UUID directly from blkid
-#    We ask for the device with TYPE="btrfs". 
-#    The screenshot proves this works and returns "4ab902fc..."
-UUID=$(blkid -t TYPE=btrfs -o value -s UUID | head -n 1)
+# 2. Get the Correct UUIDs
+#    We grab the Filesystem UUID (for Limine) and PARTUUID (to fix the kernel command line)
+#    We use blkid to be 100% sure we get the real values from the disk.
+ROOT_UUID=$(blkid -t TYPE=btrfs -o value -s UUID | head -n 1)
+ROOT_PARTUUID=$(blkid -t TYPE=btrfs -o value -s PARTUUID | head -n 1)
 
-echo "   UUID from blkid: $UUID"
-
-if [ -z "$UUID" ]; then
-    echo "CRITICAL ERROR: blkid could not find a Btrfs partition."
+if [ -z "$ROOT_UUID" ]; then
+    echo "CRITICAL ERROR: Could not find Btrfs UUID."
     exit 1
 fi
 
-# 3. Patch Limine
+echo "   Filesystem UUID: $ROOT_UUID"
+echo "   Partition UUID:  $ROOT_PARTUUID"
+
+# 3. Patch Limine Config
 CONF="/boot/efi/EFI/arch-limine/limine.conf"
 
 if [ -f "$CONF" ]; then
    echo "   Patching config at $CONF..."
    
-   # Fix 1: Generic 'boot():' entries
-   sed -i "s|boot():/|uuid($UUID):/@/boot/|g" "$CONF"
-   
-   # Fix 2: Existing 'uuid(...):/boot/' entries (archinstall default)
+   # --- FIX 1: The Kernel Path (Limine needs to see /@/boot) ---
+   # Replace generic 'boot():' with specific 'uuid(...):/@/boot/'
+   sed -i "s|boot():/|uuid($ROOT_UUID):/@/boot/|g" "$CONF"
+   # Catch existing relative paths
    sed -i "s|):/boot/|):/@/boot/|g" "$CONF"
    
-   echo "   Success: Limine patched."
+   # --- FIX 2: The Kernel Root (Linux needs the correct Drive) ---
+   # Archinstall often writes the wrong PARTUUID. We force it to use the correct one.
+   # We replace any 'root=PARTUUID=...' with 'root=PARTUUID=[ACTUAL_PARTUUID]'
+   sed -i "s|root=PARTUUID=[^ ]*|root=PARTUUID=$ROOT_PARTUUID|g" "$CONF"
+   
+   echo "   Success: Limine patched (Path + Root Fixed)."
 else
    echo "CRITICAL ERROR: Config not found at $CONF"
    exit 1
