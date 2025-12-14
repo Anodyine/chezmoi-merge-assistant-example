@@ -8,21 +8,17 @@ ROOT_DEV=$(findmnt -n -o SOURCE /)
 echo "   Root Device Detected: $ROOT_DEV"
 
 # 2. Set the Default Subvolume to ID 5 (The True Root)
-#    CRITICAL: Do NOT use 'sudo' here. We are already root in the chroot.
+#    This makes the file structure 'Atomic-Ready'
 echo "   Resetting default subvolume to ID 5..."
 btrfs subvolume set-default 5 /
 
-# 3. Verify it worked
-NEW_DEFAULT=$(btrfs subvolume get-default /)
-echo "   New Default: $NEW_DEFAULT (Target: ID 5)"
-
-# 4. Patch Limine Config (Atomic Fix)
-CONF="/boot/efi/limine/limine.conf"
+# 3. Patch Limine Config
+CONF="/boot/efi/EFI/arch-limine/limine.conf"
 
 if [ -f "$CONF" ]; then
-   echo "   Patching Limine config at $CONF..."
+   echo "   Found Limine config at: $CONF"
    
-   # Get UUID (No sudo)
+   # Get UUID of the root partition
    UUID=$(blkid -s UUID -o value "$ROOT_DEV")
    
    if [ -z "$UUID" ]; then
@@ -32,16 +28,14 @@ if [ -f "$CONF" ]; then
    
    echo "   Target UUID: $UUID"
    
-   # Replace relative paths with absolute atomic paths
-   # FROM: boot():/vmlinuz...
-   # TO:   uuid(XYZ):/@/boot/vmlinuz...
-   # (We only need one sed command with the 'g' flag)
+   # Apply the Atomic Path Fix
+   # Replaces: boot():/vmlinuz-linux
+   # With:     uuid(YOUR_UUID):/@/boot/vmlinuz-linux
    sed -i "s|boot():/|uuid($UUID):/@/boot/|g" "$CONF"
    
    echo "   Success: Limine configured for Atomic Rollbacks."
 else
-   echo "CRITICAL ERROR: Limine config not found at $CONF"
-   echo "Is the ESP mounted at /boot/efi?"
+   echo "CRITICAL ERROR: Limine config NOT found at $CONF"
    exit 1
 fi
 
