@@ -14,9 +14,7 @@
         "removable": false,
         "uki": false
     },
-    "custom_commands": [
-        "curl -L https://raw.githubusercontent.com/Anodyine/chezmoi-merge-assistant-example/refs/heads/main/fix-btrfs-layout.sh | bash"
-    ],
+    "custom_commands": [],
     "disk_config": {
         "btrfs_options": {
             "snapshot_config": null
