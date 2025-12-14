@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Title: Fully Automated Limine & Snapper Setup (with Yay Auto-Install)
-# Description: Installs Yay (if missing), dependencies, configures Limine, adds overlayfs hook, and regenerates initramfs.
+# Title: Fully Automated Limine & Snapper Setup
+# Description: Installs Yay, configures Limine (Custom Path), adds overlayfs, and enables sync.
 
 set -e
 
@@ -14,12 +14,8 @@ elif command -v yay &> /dev/null; then
     echo "Detected existing AUR helper: $AUR_HELPER"
 else
     echo "No AUR helper found. Installing yay..."
-    
-    # Install prerequisites
     sudo pacman -S --needed --noconfirm git base-devel
     
-    # Clone and install yay-bin (faster than compiling from source)
-    # We use a temporary directory to keep things clean
     TEMP_DIR=$(mktemp -d)
     git clone https://aur.archlinux.org/yay-bin.git "$TEMP_DIR/yay-bin"
     
@@ -27,9 +23,7 @@ else
     makepkg -si --noconfirm
     popd > /dev/null
     
-    # Cleanup
     rm -rf "$TEMP_DIR"
-    
     AUR_HELPER="yay"
     echo "Successfully installed yay."
 fi
@@ -38,8 +32,9 @@ fi
 echo "Installing limine-snapper-sync, snap-pac, and mkinitcpio-btrfs-overlayfs..."
 $AUR_HELPER -S --needed --noconfirm limine-snapper-sync snap-pac mkinitcpio-btrfs-overlayfs
 
-# --- 3. Configure Limine ---
+# --- 3. Configure Limine (Targeting YOUR specific path) ---
 LIMINE_CONF="/boot/EFI/arch-limine/limine.conf"
+
 if [ -f "$LIMINE_CONF" ]; then
     if grep -q "//Snapshots" "$LIMINE_CONF"; then
         echo "Limine config already contains //Snapshots directive. Skipping."
@@ -50,8 +45,27 @@ if [ -f "$LIMINE_CONF" ]; then
         echo -e "\n//Snapshots" | sudo tee -a "$LIMINE_CONF" > /dev/null
     fi
 else
-    echo "Error: $LIMINE_CONF not found. Is /boot mounted?"
+    echo "Error: $LIMINE_CONF not found. Please verify the path."
     exit 1
+fi
+
+# --- 3.5 Configure the Sync Tool (CRITICAL STEP) ---
+# We must tell limine-snapper-sync to use your custom path, 
+# otherwise it defaults to /boot/limine.conf and your menu won't update.
+SYNC_DEFAULTS="/etc/default/limine-snapper-sync"
+
+echo "Configuring limine-snapper-sync to use $LIMINE_CONF..."
+# Create the defaults file if it doesn't exist, or edit it if it does
+if [ -f "$SYNC_DEFAULTS" ]; then
+    # Replace existing config line or append if missing
+    if grep -q "LIMINE_CONFIG=" "$SYNC_DEFAULTS"; then
+        sudo sed -i "s|.*LIMINE_CONFIG=.*|LIMINE_CONFIG=\"$LIMINE_CONF\"|" "$SYNC_DEFAULTS"
+    else
+        echo "LIMINE_CONFIG=\"$LIMINE_CONF\"" | sudo tee -a "$SYNC_DEFAULTS" > /dev/null
+    fi
+else
+    # Create file with the variable
+    echo "LIMINE_CONFIG=\"$LIMINE_CONF\"" | sudo tee "$SYNC_DEFAULTS" > /dev/null
 fi
 
 # --- 4. Configure mkinitcpio (OverlayFS Hook) ---
@@ -63,22 +77,12 @@ if grep -q "$HOOK_NAME" "$MKINIT_CONF"; then
 else
     echo "Backing up mkinitcpio.conf..."
     sudo cp "$MKINIT_CONF" "$MKINIT_CONF.bak"
-    
     echo "Injecting '$HOOK_NAME' into HOOKS..."
-    # Uses sed to append 'btrfs-overlayfs' immediately after 'filesystems'
     sudo sed -i "s/filesystems/filesystems $HOOK_NAME/" "$MKINIT_CONF"
-    
-    # Verify the edit worked
-    if grep -q "$HOOK_NAME" "$MKINIT_CONF"; then
-        echo "Successfully added hook."
-    else
-        echo "Error: Failed to inject hook automatically. Please check $MKINIT_CONF manually."
-        exit 1
-    fi
 fi
 
 # --- 5. Regenerate Initramfs ---
-echo "Regenerating initramfs (this may take a moment)..."
+echo "Regenerating initramfs..."
 sudo mkinitcpio -P
 
 # --- 6. Enable Services & Sync ---
@@ -89,6 +93,6 @@ echo "Running initial snapshot sync..."
 sudo limine-snapper-sync
 
 echo "----------------------------------------------------------------"
-echo "SUCCESS: Bootable snapshots are configured."
-echo "You can now reboot and see your snapshots in the Limine menu."
+echo "SUCCESS: Bootable snapshots are configured for:"
+echo " $LIMINE_CONF"
 echo "----------------------------------------------------------------"
