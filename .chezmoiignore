@@ -1,0 +1,12 @@
+# Configuration & Lists
+archinstall-config.json
+led_color.txt
+packages.flatpak.list
+packages.pacman.list
+packages.yay.list
+vscode-extensions.list
+README.md
+
+# Folders
+tools
+wallpapers
