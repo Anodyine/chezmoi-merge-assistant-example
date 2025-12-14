@@ -1,23 +1,40 @@
 #!/bin/bash
 
-# Title: Fully Automated Limine & Snapper Setup
-# Description: Installs dependencies, configures Limine, adds overlayfs hook, and regenerates initramfs.
-# Dependencies: yay or paru
+# Title: Fully Automated Limine & Snapper Setup (with Yay Auto-Install)
+# Description: Installs Yay (if missing), dependencies, configures Limine, adds overlayfs hook, and regenerates initramfs.
 
 set -e
 
-# --- 1. Helper Detection ---
+# --- 1. Helper Detection & Auto-Install ---
 if command -v paru &> /dev/null; then
     AUR_HELPER="paru"
+    echo "Detected existing AUR helper: $AUR_HELPER"
 elif command -v yay &> /dev/null; then
     AUR_HELPER="yay"
+    echo "Detected existing AUR helper: $AUR_HELPER"
 else
-    echo "Error: No AUR helper (yay/paru) found. Please install one first."
-    exit 1
+    echo "No AUR helper found. Installing yay..."
+    
+    # Install prerequisites
+    sudo pacman -S --needed --noconfirm git base-devel
+    
+    # Clone and install yay-bin (faster than compiling from source)
+    # We use a temporary directory to keep things clean
+    TEMP_DIR=$(mktemp -d)
+    git clone https://aur.archlinux.org/yay-bin.git "$TEMP_DIR/yay-bin"
+    
+    pushd "$TEMP_DIR/yay-bin" > /dev/null
+    makepkg -si --noconfirm
+    popd > /dev/null
+    
+    # Cleanup
+    rm -rf "$TEMP_DIR"
+    
+    AUR_HELPER="yay"
+    echo "Successfully installed yay."
 fi
-echo "Using AUR helper: $AUR_HELPER"
 
-# --- 2. Install All Dependencies ---
+# --- 2. Install System Dependencies ---
 echo "Installing limine-snapper-sync, snap-pac, and mkinitcpio-btrfs-overlayfs..."
 $AUR_HELPER -S --needed --noconfirm limine-snapper-sync snap-pac mkinitcpio-btrfs-overlayfs
 
@@ -37,7 +54,7 @@ else
     exit 1
 fi
 
-# --- 4. Configure mkinitcpio (The "Manual" Step) ---
+# --- 4. Configure mkinitcpio (OverlayFS Hook) ---
 MKINIT_CONF="/etc/mkinitcpio.conf"
 HOOK_NAME="btrfs-overlayfs"
 
@@ -48,8 +65,7 @@ else
     sudo cp "$MKINIT_CONF" "$MKINIT_CONF.bak"
     
     echo "Injecting '$HOOK_NAME' into HOOKS..."
-    # This uses sed to find 'filesystems' and appends 'btrfs-overlayfs' immediately after it.
-    # This placement ensures the overlay is ready when filesystems are mounted.
+    # Uses sed to append 'btrfs-overlayfs' immediately after 'filesystems'
     sudo sed -i "s/filesystems/filesystems $HOOK_NAME/" "$MKINIT_CONF"
     
     # Verify the edit worked
