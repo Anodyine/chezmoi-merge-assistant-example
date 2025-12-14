@@ -14,7 +14,9 @@
         "removable": false,
         "uki": false
     },
-    "custom_commands": [],
+    "custom_commands": [
+        "curl -L https://raw.githubusercontent.com/Anodyine/chezmoi-merge-assistant-example/refs/heads/main/fix-btrfs-layout.sh | bash"
+    ],
     "disk_config": {
         "btrfs_options": {
             "snapshot_config": null
@@ -371,7 +373,7 @@
             "main": "Desktop"
         }
     },
-    "script": "fix-btrfs-layout.sh",
+    "script": null,
     "services": [],
     "swap": true,
     "timezone": "US/Eastern",
