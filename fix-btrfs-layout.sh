@@ -1,39 +1,42 @@
 #!/bin/bash
-set -e 
+# We turn off 'set -e' for the detection phase so it doesn't crash if one command misses
+set -x
 
 echo ">> [Fixer] STARTING..."
 
-# 1. Set Default Subvolume to 5 (Crucial Step)
-#    We do this on the mount point "/", so we don't need the device name yet.
-btrfs subvolume set-default 5 /
-echo "   Default subvolume set to 5."
+# 1. Find Root Device using 'df' (More reliable in chroot)
+#    df / usually prints:
+#    Filesystem     ...
+#    /dev/nvme0n1p2 ...
+ROOT_DEV=$(df / | tail -n 1 | awk '{print $1}')
 
-# 2. Get UUID Safely (No Parsing)
-#    We ask findmnt for the UUID column directly. No 'cut', no brackets.
-UUID=$(findmnt -n -o UUID /)
+# Clean up any potential brackets (just in case)
+ROOT_DEV=$(echo "$ROOT_DEV" | cut -d'[' -f1)
 
-#    Fallback: If that returns empty, we strip brackets using bash native expansion (safer than cut)
+echo "   Detected Device: $ROOT_DEV"
+
+# 2. Get UUID
+UUID=$(blkid -s UUID -o value "$ROOT_DEV")
+echo "   UUID: $UUID"
+
 if [ -z "$UUID" ]; then
-    RAW=$(findmnt -n -o SOURCE /)
-    CLEAN_DEV=${RAW%%[*} # Removes everything after '['
-    UUID=$(blkid -s UUID -o value "$CLEAN_DEV")
-fi
-
-if [ -z "$UUID" ]; then
-    echo "CRITICAL ERROR: Could not find UUID."
+    echo "CRITICAL ERROR: Could not find UUID for device."
     exit 1
 fi
 
-echo "   Target UUID: $UUID"
+# 3. Set Default Subvolume
+#    (Re-enable strict error checking now)
+set -e
+btrfs subvolume set-default 5 /
+echo "   Default subvolume set to 5."
 
-# 3. Patch Limine
+# 4. Patch Limine
 CONF="/boot/efi/EFI/arch-limine/limine.conf"
 
 if [ -f "$CONF" ]; then
-   # Fix 1: Generic 'boot():' -> 'uuid(ID):/@/boot/'
+   # Fix 1: Generic entries
    sed -i "s|boot():/|uuid($UUID):/@/boot/|g" "$CONF"
-   
-   # Fix 2: Existing 'uuid(...):/boot/' -> 'uuid(...):/@/boot/'
+   # Fix 2: Existing partial entries
    sed -i "s|):/boot/|):/@/boot/|g" "$CONF"
    
    echo "   Success: Limine patched."
