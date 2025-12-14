@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Title: Automated Limine & Snapper Setup (Documentation Compliant)
-# Description: Installs official hooks, configures Limine, and enables snapshot syncing.
+# Title: Automated Limine & Snapper Setup (Silent & Fixed)
+# Description: Installs hooks, configures Limine/Snapper, and regenerates images non-interactively.
 
 set -e
 
@@ -20,13 +20,13 @@ else
     AUR_HELPER="yay"
 fi
 
-# --- 2. Install Packages ---
-# limine-mkinitcpio-hook: Provides the "btrfs-overlayfs" hook we need (no manual creation required).
+# --- 2. Install Packages (Silent) ---
+# Added --answerclean and --answerdiff to suppress the "Diffs to show?" prompts
 echo "Installing dependencies..."
-$AUR_HELPER -S --needed --noconfirm limine-snapper-sync snap-pac limine-mkinitcpio-hook
+$AUR_HELPER -S --needed --noconfirm --answerclean None --answerdiff None \
+    limine-snapper-sync snap-pac limine-mkinitcpio-hook
 
 # --- 3. Configure Limine ---
-# Targeting your specific path as established previously
 LIMINE_CONF="/boot/EFI/arch-limine/limine.conf"
 
 if [ -f "$LIMINE_CONF" ]; then
@@ -41,16 +41,12 @@ else
     exit 1
 fi
 
-# --- 4. Central Configuration (/etc/default/limine) ---
-# The docs state /etc/default/limine overrides other configs.
-# We set the config path here so limine-snapper-sync knows where to look.
+# --- 4. Central Configuration ---
 DEFAULT_CONF="/etc/default/limine"
-
 echo "Configuring global defaults..."
-# Ensure the file exists
 sudo touch "$DEFAULT_CONF"
 
-# Set the Limine Config path
+# Set the Limine Config path so tools know where to write
 if grep -q "LIMINE_CONFIG=" "$DEFAULT_CONF"; then
     sudo sed -i "s|.*LIMINE_CONFIG=.*|LIMINE_CONFIG=\"$LIMINE_CONF\"|" "$DEFAULT_CONF"
 else
@@ -58,7 +54,6 @@ else
 fi
 
 # --- 5. Enable Overlay Hook ---
-# The hook file now exists (thanks to the package), we just need to enable it in the config.
 MKINIT_CONF="/etc/mkinitcpio.conf"
 HOOK_NAME="btrfs-overlayfs"
 
@@ -70,13 +65,16 @@ else
     sudo sed -i "s/filesystems/filesystems $HOOK_NAME/" "$MKINIT_CONF"
 fi
 
-# --- 6. Finalize ---
-echo "Regenerating initramfs..."
-sudo mkinitcpio -P
+# --- 6. Finalize (The Fix) ---
+# We use 'limine-mkinitcpio' instead of 'mkinitcpio -P'.
+# This command is aware of Limine, regenerates the images with the new hook,
+# and updates the boot entries without triggering the interactive warning.
+echo "Regenerating initramfs and updating Limine..."
+sudo limine-mkinitcpio
 
 echo "Enabling automation..."
 sudo systemctl enable --now limine-snapper-sync.service
 # Run one sync to populate the menu immediately
 sudo limine-snapper-sync
 
-echo "SUCCESS: Snapshot booting configured."
+echo "SUCCESS: Snapshot booting configured non-interactively."
