@@ -1,86 +1,78 @@
 #!/bin/bash
+
+# Title: Fully Automated Limine & Snapper Setup
+# Description: Installs dependencies, configures Limine, adds overlayfs hook, and regenerates initramfs.
+# Dependencies: yay or paru
+
 set -e
-# ---------------------------------------------------------------------------------
-# Snapper & Limine Setup via Chezmoi
-# ---------------------------------------------------------------------------------
 
-# packages_hash: {{ "snapper snap-pac inotify-tools git base-devel" | sha256sum }}
-
-echo ">> [Chezmoi] Starting Snapper & Limine Sync Setup..."
-
-# 1. Configure Snapper
-echo ">> [Chezmoi] Configuring Snapper root layout..."
-if [ ! -f "/etc/snapper/configs/root" ]; then
-    echo "   Config missing. preparing layout..."
-    # Unmount /.snapshots if it exists to allow fresh init
-    if mountpoint -q /.snapshots; then sudo umount /.snapshots; fi
-    if [ -d "/.snapshots" ]; then sudo rm -rf /.snapshots; fi
-
-    sudo snapper -c root create-config /
-    
-    # Re-establish the mount point
-    sudo rm -rf /.snapshots
-    sudo mkdir -p /.snapshots
-    sudo mount -a
+# --- 1. Helper Detection ---
+if command -v paru &> /dev/null; then
+    AUR_HELPER="paru"
+elif command -v yay &> /dev/null; then
+    AUR_HELPER="yay"
 else
-    echo "   Snapper config already exists. Skipping init."
+    echo "Error: No AUR helper (yay/paru) found. Please install one first."
+    exit 1
 fi
+echo "Using AUR helper: $AUR_HELPER"
 
-# 2. Configure Retention & Permissions
-echo ">> [Chezmoi] Applying retention policy..."
-CONF="/etc/snapper/configs/root"
-USER="{{ .chezmoi.username }}" 
+# --- 2. Install All Dependencies ---
+echo "Installing limine-snapper-sync, snap-pac, and mkinitcpio-btrfs-overlayfs..."
+$AUR_HELPER -S --needed --noconfirm limine-snapper-sync snap-pac mkinitcpio-btrfs-overlayfs
 
-echo "   Setting permissions for user: $USER"
-sudo chmod a+rx /.snapshots
-sudo chown :$USER /.snapshots
-
-# Standard retention policy
-sudo sed -i "s/^ALLOW_USERS=\"\"/ALLOW_USERS=\"$USER\"/" $CONF
-sudo sed -i 's/^TIMELINE_LIMIT_HOURLY=".*"/TIMELINE_LIMIT_HOURLY="5"/' $CONF
-sudo sed -i 's/^TIMELINE_LIMIT_DAILY=".*"/TIMELINE_LIMIT_DAILY="5"/' $CONF
-sudo sed -i 's/^TIMELINE_LIMIT_WEEKLY=".*"/TIMELINE_LIMIT_WEEKLY="0"/' $CONF
-sudo sed -i 's/^TIMELINE_LIMIT_MONTHLY=".*"/TIMELINE_LIMIT_MONTHLY="0"/' $CONF
-sudo sed -i 's/^TIMELINE_LIMIT_YEARLY=".*"/TIMELINE_LIMIT_YEARLY="0"/' $CONF
-sudo sed -i 's/^NUMBER_LIMIT=".*"/NUMBER_LIMIT="10"/' $CONF
-
-# 3. Enable snap-pac (Automatic snapshots on pacman update)
-# archinstall handles the package, we just verify the hook exists
-if [ -d "/usr/share/libalpm/hooks" ]; then
-    echo "   snap-pac hooks verified."
-fi
-
-# 4. Install Limine Snapper Sync (The "Omarchy" Magic)
-# This AUR package updates the Limine boot menu when snapshots are created
-echo ">> [Chezmoi] Setting up Limine-Snapper-Sync..."
-
-if ! command -v limine-snapper-sync &> /dev/null; then
-    echo "   Installing limine-snapper-sync from AUR..."
-    
-    # Create temp build dir
-    BUILD_DIR=$(mktemp -d)
-    
-    # Clone and build
-    git clone https://aur.archlinux.org/limine-snapper-sync.git "$BUILD_DIR"
-    
-    # We need to run makepkg as the non-root user
-    # Note: Ensure the user has sudo rights without password or be ready to type it
-    chown -R "$USER" "$BUILD_DIR"
-    
-    cd "$BUILD_DIR"
-    # Switch to user to build, then install with sudo
-    sudo -u "$USER" makepkg -si --noconfirm
-    
-    cd ~
-    rm -rf "$BUILD_DIR"
+# --- 3. Configure Limine ---
+LIMINE_CONF="/boot/limine.conf"
+if [ -f "$LIMINE_CONF" ]; then
+    if grep -q "//Snapshots" "$LIMINE_CONF"; then
+        echo "Limine config already contains //Snapshots directive. Skipping."
+    else
+        echo "Backing up limine.conf..."
+        sudo cp "$LIMINE_CONF" "$LIMINE_CONF.bak"
+        echo "Injecting //Snapshots directive into limine.conf..."
+        echo -e "\n//Snapshots" | sudo tee -a "$LIMINE_CONF" > /dev/null
+    fi
 else
-    echo "   limine-snapper-sync already installed."
+    echo "Error: $LIMINE_CONF not found. Is /boot mounted?"
+    exit 1
 fi
 
-# 5. Initial Sync
-echo ">> [Chezmoi] Performing initial snapshot sync..."
-# Make sure the service is enabled (it usually installs a systemd watcher or pacman hook)
-# limine-snapper-sync usually relies on a pacman hook, but we can force a run now.
+# --- 4. Configure mkinitcpio (The "Manual" Step) ---
+MKINIT_CONF="/etc/mkinitcpio.conf"
+HOOK_NAME="btrfs-overlayfs"
+
+if grep -q "$HOOK_NAME" "$MKINIT_CONF"; then
+    echo "Hook '$HOOK_NAME' already present in $MKINIT_CONF. Skipping edit."
+else
+    echo "Backing up mkinitcpio.conf..."
+    sudo cp "$MKINIT_CONF" "$MKINIT_CONF.bak"
+    
+    echo "Injecting '$HOOK_NAME' into HOOKS..."
+    # This uses sed to find 'filesystems' and appends 'btrfs-overlayfs' immediately after it.
+    # This placement ensures the overlay is ready when filesystems are mounted.
+    sudo sed -i "s/filesystems/filesystems $HOOK_NAME/" "$MKINIT_CONF"
+    
+    # Verify the edit worked
+    if grep -q "$HOOK_NAME" "$MKINIT_CONF"; then
+        echo "Successfully added hook."
+    else
+        echo "Error: Failed to inject hook automatically. Please check $MKINIT_CONF manually."
+        exit 1
+    fi
+fi
+
+# --- 5. Regenerate Initramfs ---
+echo "Regenerating initramfs (this may take a moment)..."
+sudo mkinitcpio -P
+
+# --- 6. Enable Services & Sync ---
+echo "Enabling limine-snapper-sync watcher..."
+sudo systemctl enable --now limine-snapper-sync.service
+
+echo "Running initial snapshot sync..."
 sudo limine-snapper-sync
 
-echo ">> [Chezmoi] Setup complete."
+echo "----------------------------------------------------------------"
+echo "SUCCESS: Bootable snapshots are configured."
+echo "You can now reboot and see your snapshots in the Limine menu."
+echo "----------------------------------------------------------------"
