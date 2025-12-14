@@ -1,42 +1,42 @@
 #!/bin/bash
-set -e
-set -x  # ENABLE DEBUGGING: Prints every command as it runs
+set -e 
 
-echo ">> [Fixer] STARTING POST-INSTALL BTRFS FIXES..."
+echo ">> [Fixer] STARTING..."
 
-# 1. Find the Btrfs Root Partition
-#    We use 'cut' to strip the btrfs subvolume brackets "[/@]" 
-#    that caused the previous script to crash at blkid.
-RAW_SOURCE=$(findmnt -n -o SOURCE /)
-ROOT_DEV=$(echo "$RAW_SOURCE" | cut -d'[' -f1)
-
-echo "   Raw Source: $RAW_SOURCE"
-echo "   Clean Device: $ROOT_DEV"
-
-# 2. Set Default Subvolume (ID 5)
+# 1. Set Default Subvolume to 5 (Crucial Step)
+#    We do this on the mount point "/", so we don't need the device name yet.
 btrfs subvolume set-default 5 /
+echo "   Default subvolume set to 5."
 
-# 3. Patch Limine Config
+# 2. Get UUID Safely (No Parsing)
+#    We ask findmnt for the UUID column directly. No 'cut', no brackets.
+UUID=$(findmnt -n -o UUID /)
+
+#    Fallback: If that returns empty, we strip brackets using bash native expansion (safer than cut)
+if [ -z "$UUID" ]; then
+    RAW=$(findmnt -n -o SOURCE /)
+    CLEAN_DEV=${RAW%%[*} # Removes everything after '['
+    UUID=$(blkid -s UUID -o value "$CLEAN_DEV")
+fi
+
+if [ -z "$UUID" ]; then
+    echo "CRITICAL ERROR: Could not find UUID."
+    exit 1
+fi
+
+echo "   Target UUID: $UUID"
+
+# 3. Patch Limine
 CONF="/boot/efi/EFI/arch-limine/limine.conf"
 
 if [ -f "$CONF" ]; then
-   # Get UUID (This will now succeed because ROOT_DEV is clean)
-   UUID=$(blkid -s UUID -o value "$ROOT_DEV")
-   
-   if [ -z "$UUID" ]; then
-       echo "CRITICAL ERROR: UUID is empty."
-       exit 1
-   fi
-   
-   echo "   Target UUID: $UUID"
-   
-   # Apply Atomic Fixes
-   # Fix 1: Generic entries
+   # Fix 1: Generic 'boot():' -> 'uuid(ID):/@/boot/'
    sed -i "s|boot():/|uuid($UUID):/@/boot/|g" "$CONF"
-   # Fix 2: Existing partial entries
+   
+   # Fix 2: Existing 'uuid(...):/boot/' -> 'uuid(...):/@/boot/'
    sed -i "s|):/boot/|):/@/boot/|g" "$CONF"
    
-   echo "   Success: Limine configured."
+   echo "   Success: Limine patched."
 else
    echo "CRITICAL ERROR: Config not found at $CONF"
    exit 1
