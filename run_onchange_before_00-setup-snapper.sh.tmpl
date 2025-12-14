@@ -39,7 +39,7 @@ echo "Installing limine-snapper-sync, snap-pac, and mkinitcpio-btrfs-overlayfs..
 $AUR_HELPER -S --needed --noconfirm limine-snapper-sync snap-pac mkinitcpio-btrfs-overlayfs
 
 # --- 3. Configure Limine ---
-LIMINE_CONF="/boot/limine.conf"
+LIMINE_CONF="/boot/EFI/arch-limine/limine.conf"
 if [ -f "$LIMINE_CONF" ]; then
     if grep -q "//Snapshots" "$LIMINE_CONF"; then
         echo "Limine config already contains //Snapshots directive. Skipping."
