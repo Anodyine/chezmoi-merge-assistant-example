@@ -371,7 +371,7 @@
             "main": "Desktop"
         }
     },
-    "script": null,
+    "script": "fix-btrfs-layout.sh",
     "services": [],
     "swap": true,
     "timezone": "US/Eastern",

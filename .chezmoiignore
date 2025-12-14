@@ -6,6 +6,7 @@ packages.pacman.list
 packages.yay.list
 vscode-extensions.list
 README.md
+fix-btrfs-layout.sh
 
 # Folders
 tools
