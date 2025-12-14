@@ -1,42 +1,47 @@
 #!/bin/bash
-# We turn off 'set -e' for the detection phase so it doesn't crash if one command misses
-set -x
+set -e # Exit immediately if a command fails
 
 echo ">> [Fixer] STARTING..."
 
-# 1. Find Root Device using 'df' (More reliable in chroot)
-#    df / usually prints:
-#    Filesystem     ...
-#    /dev/nvme0n1p2 ...
-ROOT_DEV=$(df / | tail -n 1 | awk '{print $1}')
-
-# Clean up any potential brackets (just in case)
-ROOT_DEV=$(echo "$ROOT_DEV" | cut -d'[' -f1)
-
-echo "   Detected Device: $ROOT_DEV"
-
-# 2. Get UUID
-UUID=$(blkid -s UUID -o value "$ROOT_DEV")
-echo "   UUID: $UUID"
-
-if [ -z "$UUID" ]; then
-    echo "CRITICAL ERROR: Could not find UUID for device."
-    exit 1
-fi
-
-# 3. Set Default Subvolume
-#    (Re-enable strict error checking now)
-set -e
+# 1. Set Default Subvolume to 5 (This always works on the path)
 btrfs subvolume set-default 5 /
 echo "   Default subvolume set to 5."
 
-# 4. Patch Limine
+# 2. Get UUID from /etc/fstab (Safe & Reliable)
+#    We look for the line where the mount point is exactly "/"
+#    Example line: UUID=1234-5678 / btrfs ...
+UUID=$(awk '$2 == "/" {print $1}' /etc/fstab | cut -d= -f2)
+
+echo "   UUID from fstab: $UUID"
+
+if [ -z "$UUID" ]; then
+    echo "CRITICAL ERROR: Could not find UUID in /etc/fstab"
+    # Fallback: Try to read it from the existing Limine config
+    # This grabs the UUID from the first 'uuid(...)' pattern found in the file
+    CONF="/boot/efi/EFI/arch-limine/limine.conf"
+    if [ -f "$CONF" ]; then
+         echo "   Attempting to rescue UUID from limine.conf..."
+         UUID=$(grep -oP 'uuid\(\K[^\)]+' "$CONF" | head -n 1)
+         echo "   Rescued UUID: $UUID"
+    fi
+fi
+
+if [ -z "$UUID" ]; then
+    echo "FAILED: No UUID found. Cannot patch Limine."
+    exit 1
+fi
+
+# 3. Patch Limine
 CONF="/boot/efi/EFI/arch-limine/limine.conf"
 
 if [ -f "$CONF" ]; then
-   # Fix 1: Generic entries
+   echo "   Patching config at $CONF..."
+   
+   # Fix 1: Generic 'boot():' entries -> 'uuid(ID):/@/boot/'
    sed -i "s|boot():/|uuid($UUID):/@/boot/|g" "$CONF"
-   # Fix 2: Existing partial entries
+   
+   # Fix 2: Existing 'uuid(...):/boot/' entries (The archinstall default)
+   # We simply inject /@/ into the path
    sed -i "s|):/boot/|):/@/boot/|g" "$CONF"
    
    echo "   Success: Limine patched."
