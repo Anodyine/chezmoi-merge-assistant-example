@@ -88,9 +88,9 @@ sudo systemctl enable --now grub-btrfsd
 echo ">> [Chezmoi] Checking Bootloader Stub..."
 STUB_FILE="/boot/efi/grub/grub.cfg"
 
-# Only run the heavy Grub Install if the stub file is missing
-if [ ! -f "$STUB_FILE" ]; then
-    echo "   Stub missing. Installing GRUB modules and creating stub..."
+# FIX: Also check if /boot/grub directory is missing (happens on reinstall)
+if [ ! -f "$STUB_FILE" ] || [ ! -d "/boot/grub" ]; then
+    echo "   Stub missing or /boot/grub empty. Installing GRUB modules and creating stub..."
     
     sudo grub-install --target=x86_64-efi \
       --efi-directory=/boot/efi \
