@@ -51,6 +51,16 @@ else
     echo "LIMINE_CONFIG=\"$LIMINE_CONF\"" | sudo tee -a "$DEFAULT_CONF" > /dev/null
 fi
 
+SNAPSHOTS_PATH="/@snapshots"
+echo "Setting ROOT_SNAPSHOTS_PATH=$SNAPSHOTS_PATH to fix synchronization error."
+if grep -q "ROOT_SNAPSHOTS_PATH=" "$DEFAULT_CONF"; then
+    # Update existing line
+    sudo sed -i "s|.*ROOT_SNAPSHOTS_PATH=.*|ROOT_SNAPSHOTS_PATH=\"$SNAPSHOTS_PATH\"|" "$DEFAULT_CONF"
+else
+    # Add new line
+    echo "ROOT_SNAPSHOTS_PATH=\"$SNAPSHOTS_PATH\"" | sudo tee -a "$DEFAULT_CONF" > /dev/null
+fi
+
 # --- 5. Enable Overlay Hook ---
 MKINIT_CONF="/etc/mkinitcpio.conf"
 HOOK_NAME="btrfs-overlayfs"
@@ -63,10 +73,27 @@ else
 fi
 
 # --- 6. Configure Snapper Retention (Balanced / 2TB Policy) ---
-# Check if root config exists (archinstall usually creates it), if not create it
-if ! sudo snapper -c root list &>/dev/null; then
-    echo "Creating Snapper 'root' config..."
+if [ ! -f "/etc/snapper/configs/root" ]; then
+    echo "   Config missing. preparing layout..."
+    
+    # Unmount if strictly necessary to recreate layout
+    if mountpoint -q /.snapshots; then
+        sudo umount /.snapshots
+    fi
+
+    # Remove directory to allow snapper to initialize
+    if [ -d "/.snapshots" ]; then
+        sudo rm -rf /.snapshots
+    fi
+
     sudo snapper -c root create-config /
+    
+    # Fix the directory structure immediately after creation
+    sudo rm -rf /.snapshots
+    sudo mkdir -p /.snapshots
+    sudo mount -a
+else
+    echo "   Snapper config already exists. Skipping init."
 fi
 
 echo "Setting Snapper retention limits (Balanced Policy)..."
