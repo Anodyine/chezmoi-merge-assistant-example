@@ -1,5 +1,6 @@
 # Configuration & Lists
 archinstall-config.json
+user_configuration.json
 led_color.txt
 packages.flatpak.list
 packages.pacman.list
