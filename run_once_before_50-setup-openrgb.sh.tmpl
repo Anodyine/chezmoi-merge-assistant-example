@@ -64,27 +64,44 @@ if ! groups "$USER" | grep -q '\bi2c\b'; then
     info "Added $USER to i2c group. (Log out required to take effect)."
 fi
 
-# 5. Patch Limine Kernel Arguments
-# LIMINE_DEFAULT="/etc/default/limine"
-# if [ -f "$LIMINE_DEFAULT" ]; then
-#     if ! grep -q "acpi_enforce_resources=lax" "$LIMINE_DEFAULT"; then
-#         info "Patching Limine for SMBus access..."
-#         # Securely append with a leading space
-#         echo 'KERNEL_CMDLINE[default]+=" acpi_enforce_resources=lax"' | sudo tee -a "$LIMINE_DEFAULT" >/dev/null
+# 5. Patch Limine Kernel Arguments (The Safe Way)
+LIMINE_DEFAULT="/etc/default/limine"
+TARGET_PARAM="acpi_enforce_resources=lax"
+
+if [ -f "$LIMINE_DEFAULT" ]; then
+    # Only run if the param is missing from the config
+    if ! grep -q "$TARGET_PARAM" "$LIMINE_DEFAULT"; then
+        info "Patching Limine for SMBus access..."
+
+        # 1. Get current running args (The Source of Truth)
+        # We strip out BOOT_IMAGE and initrd because Limine handles those automatically
+        CURRENT_ARGS=$(sed 's/BOOT_IMAGE=[^ ]* //g; s/initrd=[^ ]* //g' /proc/cmdline)
         
-#         # Regenerate UKI
-#         if command -v limine-mkinitcpio >/dev/null; then
-#             info "Regenerating Limine UKI..."
-#             sudo limine-mkinitcpio
-#         else
-#             warn "limine-mkinitcpio not found. Please regenerate your kernel manually."
-#         fi
-#     else
-#         info "Limine config already patched."
-#     fi
-# else
-#     warn "$LIMINE_DEFAULT not found. Skipping bootloader patch."
-# fi
+        # 2. Construct the NEW full command line
+        # This ensures we keep 'root=UUID...' and just add our param to the end
+        NEW_CMDLINE="$CURRENT_ARGS $TARGET_PARAM"
+        
+        # 3. Write the FULL line to the config using '=' assignment (not +=)
+        # This prevents the generator from getting confused or dropping the defaults
+        echo "KERNEL_CMDLINE[default]=\"$NEW_CMDLINE\"" | sudo tee -a "$LIMINE_DEFAULT" >/dev/null
+        
+        info "Updated $LIMINE_DEFAULT with full argument list."
+        info "Regenerating Limine config..."
+        
+        if command -v limine-mkinitcpio >/dev/null; then
+            sudo limine-mkinitcpio
+        elif command -v limine-update >/dev/null; then
+            sudo limine-update
+        else
+            warn "Could not find limine-mkinitcpio or limine-update. Please regenerate manually."
+        fi
+        
+    else
+        info "Limine config already patched."
+    fi
+else
+    warn "$LIMINE_DEFAULT not found. Skipping bootloader patch."
+fi
 
 info "OpenRGB setup complete."
 
