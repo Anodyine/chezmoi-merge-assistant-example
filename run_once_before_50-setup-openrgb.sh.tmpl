@@ -13,23 +13,18 @@ info() { printf "\033[1;32m[INFO]\033[0m %s\n" "$*"; }
 warn() { printf "\033[1;33m[WARN]\033[0m %s\n" "$*"; }
 err()  { printf "\033[1;31m[ERR ]\033[0m %s\n" "$*" >&2; }
 
-# ---------- checks
-if [[ "$(hostname)" != "ml-server" ]]; then
-    warn "This script is intended for 'ml-server'. Current hostname is '$(hostname)'."
-    read -p "Run anyway? [y/N] " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 1
-    fi
-fi
-
 # ---------- main logic
 info "Starting OpenRGB Setup..."
 
 # 1. Install packages
 if ! pacman -Qi openrgb >/dev/null 2>&1; then
     info "Installing OpenRGB and i2c-tools..."
-    sudo pacman -S --needed --noconfirm openrgb i2c-tools
+    sudo pacman -S --needed --noconfirm openrgb
+fi
+
+if ! pacman -Qi i2c-tools >/dev/null 2>&1; then
+    info "Installing OpenRGB and i2c-tools..."
+    sudo pacman -S --needed --noconfirm i2c-tools
 fi
 
 # 2. Configure Kernel Modules
@@ -44,8 +39,6 @@ if [ ! -f /etc/modules-load.d/i2c-piix4.conf ]; then
     echo "i2c-piix4" | sudo tee /etc/modules-load.d/i2c-piix4.conf >/dev/null
     info "Enabled i2c-piix4 module."
 fi
-# 2. Configure Kernel Modules
-... (i2c-dev and i2c-piix4 checks) ...
 
 # Load modules immediately
 if ! lsmod | grep -q i2c_dev; then
@@ -72,26 +65,26 @@ if ! groups "$USER" | grep -q '\bi2c\b'; then
 fi
 
 # 5. Patch Limine Kernel Arguments
-LIMINE_DEFAULT="/etc/default/limine"
-if [ -f "$LIMINE_DEFAULT" ]; then
-    if ! grep -q "acpi_enforce_resources=lax" "$LIMINE_DEFAULT"; then
-        info "Patching Limine for SMBus access..."
-        # Securely append with a leading space
-        echo 'KERNEL_CMDLINE[default]+=" acpi_enforce_resources=lax"' | sudo tee -a "$LIMINE_DEFAULT" >/dev/null
+# LIMINE_DEFAULT="/etc/default/limine"
+# if [ -f "$LIMINE_DEFAULT" ]; then
+#     if ! grep -q "acpi_enforce_resources=lax" "$LIMINE_DEFAULT"; then
+#         info "Patching Limine for SMBus access..."
+#         # Securely append with a leading space
+#         echo 'KERNEL_CMDLINE[default]+=" acpi_enforce_resources=lax"' | sudo tee -a "$LIMINE_DEFAULT" >/dev/null
         
-        # Regenerate UKI
-        if command -v limine-mkinitcpio >/dev/null; then
-            info "Regenerating Limine UKI..."
-            sudo limine-mkinitcpio
-        else
-            warn "limine-mkinitcpio not found. Please regenerate your kernel manually."
-        fi
-    else
-        info "Limine config already patched."
-    fi
-else
-    warn "$LIMINE_DEFAULT not found. Skipping bootloader patch."
-fi
+#         # Regenerate UKI
+#         if command -v limine-mkinitcpio >/dev/null; then
+#             info "Regenerating Limine UKI..."
+#             sudo limine-mkinitcpio
+#         else
+#             warn "limine-mkinitcpio not found. Please regenerate your kernel manually."
+#         fi
+#     else
+#         info "Limine config already patched."
+#     fi
+# else
+#     warn "$LIMINE_DEFAULT not found. Skipping bootloader patch."
+# fi
 
 info "OpenRGB setup complete."
 
