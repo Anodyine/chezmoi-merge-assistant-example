@@ -51,6 +51,16 @@ else
     echo "LIMINE_CONFIG=\"$LIMINE_CONF\"" | sudo tee -a "$DEFAULT_CONF" > /dev/null
 fi
 
+SNAPSHOTS_PATH="/@snapshots"
+echo "Setting ROOT_SNAPSHOTS_PATH=$SNAPSHOTS_PATH to fix synchronization error."
+if grep -q "ROOT_SNAPSHOTS_PATH=" "$DEFAULT_CONF"; then
+    # Update existing line
+    sudo sed -i "s|.*ROOT_SNAPSHOTS_PATH=.*|ROOT_SNAPSHOTS_PATH=\"$SNAPSHOTS_PATH\"|" "$DEFAULT_CONF"
+else
+    # Add new line
+    echo "ROOT_SNAPSHOTS_PATH=\"$SNAPSHOTS_PATH\"" | sudo tee -a "$DEFAULT_CONF" > /dev/null
+fi
+
 # --- 5. Enable Overlay Hook ---
 MKINIT_CONF="/etc/mkinitcpio.conf"
 HOOK_NAME="btrfs-overlayfs"
