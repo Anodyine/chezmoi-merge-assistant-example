@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Title: Automated Limine & Snapper Setup (Silent & Fixed)
-# Description: Installs hooks, configures Limine/Snapper, and regenerates images non-interactively.
+# Title: Automated Limine & Snapper Setup (Silent & Fixed + Retention)
+# Description: Installs hooks, configures Limine/Snapper, sets retention, and regenerates images.
 
 set -e
 
@@ -21,7 +21,6 @@ else
 fi
 
 # --- 2. Install Packages (Silent) ---
-# Added --answerclean and --answerdiff to suppress the "Diffs to show?" prompts
 echo "Installing dependencies..."
 $AUR_HELPER -S --needed --noconfirm --answerclean None --answerdiff None \
     limine-snapper-sync snap-pac limine-mkinitcpio-hook
@@ -46,7 +45,6 @@ DEFAULT_CONF="/etc/default/limine"
 echo "Configuring global defaults..."
 sudo touch "$DEFAULT_CONF"
 
-# Set the Limine Config path so tools know where to write
 if grep -q "LIMINE_CONFIG=" "$DEFAULT_CONF"; then
     sudo sed -i "s|.*LIMINE_CONFIG=.*|LIMINE_CONFIG=\"$LIMINE_CONF\"|" "$DEFAULT_CONF"
 else
@@ -61,20 +59,33 @@ if grep -q "$HOOK_NAME" "$MKINIT_CONF"; then
     echo "Hook '$HOOK_NAME' already active."
 else
     echo "Adding '$HOOK_NAME' to mkinitcpio.conf..."
-    # Insert 'btrfs-overlayfs' immediately after 'filesystems'
     sudo sed -i "s/filesystems/filesystems $HOOK_NAME/" "$MKINIT_CONF"
 fi
 
-# --- 6. Finalize (The Fix) ---
-# We use 'limine-mkinitcpio' instead of 'mkinitcpio -P'.
-# This command is aware of Limine, regenerates the images with the new hook,
-# and updates the boot entries without triggering the interactive warning.
+# --- 6. Configure Snapper Retention (Balanced / 2TB Policy) ---
+# Check if root config exists (archinstall usually creates it), if not create it
+if ! sudo snapper -c root list &>/dev/null; then
+    echo "Creating Snapper 'root' config..."
+    sudo snapper -c root create-config /
+fi
+
+echo "Setting Snapper retention limits (Balanced Policy)..."
+# Hourly: 10, Daily: 21 (3 weeks), Weekly: 4 (1 month), Monthly: 2, Yearly: 0
+sudo snapper -c root set-config \
+    TIMELINE_LIMIT_HOURLY="10" \
+    TIMELINE_LIMIT_DAILY="21" \
+    TIMELINE_LIMIT_WEEKLY="4" \
+    TIMELINE_LIMIT_MONTHLY="2" \
+    TIMELINE_LIMIT_YEARLY="0"
+
+# --- 7. Finalize ---
 echo "Regenerating initramfs and updating Limine..."
 sudo limine-mkinitcpio
 
 echo "Enabling automation..."
 sudo systemctl enable --now limine-snapper-sync.service
-# Run one sync to populate the menu immediately
+
+echo "Running initial snapshot sync..."
 sudo limine-snapper-sync
 
 echo "SUCCESS: Snapshot booting configured non-interactively."
