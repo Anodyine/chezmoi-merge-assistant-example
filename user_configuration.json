@@ -65,6 +65,10 @@
                                 "name": "@home"
                             },
                             {
+                                "mountpoint": "/.snapshots",
+                                "name": "@snapshots"
+                            },
+                            {
                                 "mountpoint": "/var/log",
                                 "name": "@log"
                             },
