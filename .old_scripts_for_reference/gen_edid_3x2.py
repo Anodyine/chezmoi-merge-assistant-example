@@ -9,10 +9,12 @@ def make_edid():
     established = b'\xbf\xef\x80'
     standard = b'\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01'
 
-    # --- DETAILED TIMING 1: 1920x1280 @ 60Hz (CVT-RB) ---
-    # Pixel Clock: 153.25 MHz
-    # Bytes: 2D 3C 80 A0 70 00 1E 40 30 20 35 00 00 00 00 00 00 1A
-    dt1 = b'\x2d\x3c\x80\xa0\x70\x00\x1e\x40\x30\x20\x35\x00\x00\x00\x00\x00\x00\x1a'
+    # --- DETAILED TIMING 1: 1920x1280 @ 60Hz ---
+    # Pixel Clock: 153.25 MHz -> 0x3BDD -> \xDD\x3B
+    # Horizontal: 1920 active, 160 blanking
+    # Vertical: 1280 active, 29 blanking
+    # Bytes 12-14 carry the high nibbles for H/V Active and Blanking
+    dt1 = b'\xdd\x3b\x80\xa0\x70\x00\x1e\x50\x30\x20\x35\x00\x00\x00\x00\x00\x00\x1a'
 
     # --- DETAILED TIMING 2: 1920x1080 @ 60Hz (Backup) ---
     dt2 = b'\x02\x3a\x80\x18\x71\x38\x2d\x40\x58\x2c\x45\x00\x00\x00\x00\x00\x00\x1e'
@@ -26,7 +28,7 @@ def make_edid():
     
     with open("edid-3x2.bin", "wb") as f:
         f.write(body + bytes([checksum]))
-    print("Generated edid-3x2.bin (1920x1280 @ 60Hz).")
+    print("Generated fixed 1920x1280 EDID.")
 
 if __name__ == "__main__":
     make_edid()

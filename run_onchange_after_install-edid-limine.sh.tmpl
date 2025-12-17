@@ -1,79 +1,48 @@
-{{- if eq .chezmoi.hostname "arch-lenovo" -}}
 #!/bin/bash
 set -euo pipefail
 
-# This hash ensures the script re-runs if the binary changes in the repo
-# hash: {{ include "files/edid/edid-arch-lenovo.bin" | sha256sum }}
-
-SRC="{{ .chezmoi.sourceDir }}/files/edid/edid-arch-lenovo.bin"
+HOSTNAME="{{ .chezmoi.hostname }}"
 DEST="/usr/lib/firmware/edid/edid.bin"
-LIMINE_CONFIG="/etc/default/limine"
+LIMINE_DEFAULT="/etc/default/limine"
 
-# --- 1. INSTALL EDID BINARY ---
-echo "Checking EDID binary..."
-if [[ ! -f "$DEST" ]] || ! cmp -s "$SRC" "$DEST"; then
-    echo "⚡ EDID binary changed or missing. Installing..."
-    sudo mkdir -p "$(dirname "$DEST")"
-    sudo cp "$SRC" "$DEST"
-else
-    echo "✅ EDID binary is up to date."
-fi
-
-# --- 2. CONFIGURE MKINITCPIO ---
-# Ensure the file is included in the initramfs
-if ! grep -q "/usr/lib/firmware/edid/edid.bin" /etc/mkinitcpio.conf; then
-    echo "⚡ Adding EDID to mkinitcpio.conf FILES..."
-    # This uses a safe sed replacement to insert into the FILES=() array
-    sudo sed -i 's|FILES=(|FILES=(/usr/lib/firmware/edid/edid.bin |' /etc/mkinitcpio.conf
-else
-    echo "✅ mkinitcpio FILES configured."
-fi
-
-# --- 3. PATCH LIMINE (The Safe Way) ---
-# We want to add nvidia modeset AND the edid firmware override for DP-2
+# --- HOST CONFIGURATION ---
+{{ if eq .chezmoi.hostname "arch-lenovo" -}}
+SRC="{{ .chezmoi.sourceDir }}/files/edid/edid-arch-lenovo.bin"
 TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=DP-2:edid/edid.bin"
+# hash: {{ include "files/edid/edid-arch-lenovo.bin" | sha256sum }}
+{{ else if eq .chezmoi.hostname "ml-server" -}}
+SRC="{{ .chezmoi.sourceDir }}/files/edid/edid-ml-server.bin"
+TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=HDMI-A-2:edid/edid.bin"
+# hash: {{ include "files/edid/edid-ml-server.bin" | sha256sum }}
+{{ else -}}
+echo "Host $HOSTNAME not configured for EDID override."
+exit 0
+{{ end -}}
 
-if [ -f "$LIMINE_CONFIG" ]; then
-    # Only run if our specific params are missing from the config
-    if ! grep -q "drm.edid_firmware=DP-2" "$LIMINE_CONFIG"; then
-        echo "⚡ Patching Limine for EDID override..."
+# --- INSTALL EDID BINARY ---
+echo "Installing EDID for $HOSTNAME..."
+sudo mkdir -p "$(dirname "$DEST")"
+sudo cp "$SRC" "$DEST"
 
-        # 1. Get current running args (Source of Truth)
-        # Strip BOOT_IMAGE, initrd, and any old instances of our target params to avoid duplicates
+# --- CONFIGURE MKINITCPIO ---
+if ! grep -q "/usr/lib/firmware/edid/edid.bin" /etc/mkinitcpio.conf; then
+    sudo sed -i 's|FILES=(|FILES=(/usr/lib/firmware/edid/edid.bin |' /etc/mkinitcpio.conf
+fi
+
+# --- PATCH LIMINE ---
+if [ -f "$LIMINE_DEFAULT" ]; then
+    # Use a more generic grep to see if ANY firmware override is already there
+    if ! grep -q "drm.edid_firmware=" "$LIMINE_DEFAULT"; then
+        echo "⚡ Patching Limine for $HOSTNAME..."
         CURRENT_ARGS=$(sed 's/BOOT_IMAGE=[^ ]* //g; s/initrd=[^ ]* //g; s/nvidia_drm.modeset=[^ ]* //g; s/drm.edid_firmware=[^ ]* //g' /proc/cmdline)
+        echo "KERNEL_CMDLINE[default]=\"$CURRENT_ARGS $TARGET_PARAMS\"" | sudo tee -a "$LIMINE_DEFAULT" >/dev/null
         
-        # 2. Construct NEW command line
-        NEW_CMDLINE="$CURRENT_ARGS $TARGET_PARAMS"
-        
-        # 3. Write to config
-        # We append to ensure we don't break the file structure, but the generator usually takes the last definition.
-        echo "KERNEL_CMDLINE[default]=\"$NEW_CMDLINE\"" | sudo tee -a "$LIMINE_CONFIG" >/dev/null
-        
-        echo "✅ Updated $LIMINE_CONFIG"
-        
-        # 4. Regenerate Limine and Initramfs
-        echo "⚡ Regenerating Boot Configuration..."
-        # If using limine-mkinitcpio, it handles both initramfs and limine.cfg
+        # Regenerate
         if command -v limine-mkinitcpio >/dev/null; then
             sudo limine-mkinitcpio
-        elif command -v limine-update >/dev/null; then
-             # Standard mkinitcpio then update
-            sudo mkinitcpio -P
-            sudo limine-update
         else
             sudo mkinitcpio -P
-            echo "⚠️ Could not find limine generator command. Please check your bootloader config manually."
+            sudo limine-update
         fi
-        
-        echo "✅ Boot setup complete. REBOOT REQUIRED."
-    else
-        echo "✅ Limine config already contains EDID parameters."
-        # Still run mkinitcpio if the binary changed (handled by the hash check trigger at top)
-        # We force a rebuild here just in case the binary changed but the config didn't.
-        sudo mkinitcpio -P
     fi
-else
-    echo "⚠️ $LIMINE_CONFIG not found. Skipping bootloader patch."
 fi
-
-{{- end -}}
