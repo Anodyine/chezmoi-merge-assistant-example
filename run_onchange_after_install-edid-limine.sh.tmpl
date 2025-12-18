@@ -2,79 +2,47 @@
 set -euo pipefail
 
 HOSTNAME="{{ .chezmoi.hostname }}"
-EDID_DIR="/usr/lib/firmware/edid"
+DEST="/usr/lib/firmware/edid/edid.bin"
 LIMINE_DEFAULT="/etc/default/limine"
 
 # --- HOST CONFIGURATION ---
 {{ if eq .chezmoi.hostname "arch-lenovo" -}}
-# Single monitor setup for Lenovo
-SRC_1="{{ .chezmoi.sourceDir }}/files/edid/edid-arch-lenovo.bin"
-DEST_1="$EDID_DIR/edid.bin"
+SRC="{{ .chezmoi.sourceDir }}/files/edid/edid-arch-lenovo.bin"
 TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=DP-2:edid/edid.bin"
 # hash: {{ include "files/edid/edid-arch-lenovo.bin" | sha256sum }}
-
 {{ else if eq .chezmoi.hostname "ml-server" -}}
-# Dual monitor setup for ML-Server
-SRC_1="{{ .chezmoi.sourceDir }}/files/edid/edid-ml-server.bin"
-DEST_1="$EDID_DIR/edid-3x2.bin"
-SRC_2="{{ .chezmoi.sourceDir }}/files/edid/edid-1440p-56.bin"
-DEST_2="$EDID_DIR/edid-1440p.bin"
-
-# We use the comma-separated format to map both monitors in one parameter
-TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=HDMI-A-1:edid/edid-1440p.bin,HDMI-A-2:edid/edid-3x2.bin"
-
-# hashes to trigger script on change:
-# hash1: {{ include "files/edid/edid-ml-server.bin" | sha256sum }}
-# hash2: {{ include "files/edid/edid-1440p-56.bin" | sha256sum }}
-
+SRC="{{ .chezmoi.sourceDir }}/files/edid/edid-ml-server.bin"
+TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=HDMI-A-2:edid/edid.bin"
+# hash: {{ include "files/edid/edid-ml-server.bin" | sha256sum }}
 {{ else -}}
 echo "Host $HOSTNAME not configured for EDID override."
 exit 0
 {{ end -}}
 
-# --- INSTALL EDID BINARIES ---
-echo "Installing EDID binaries for $HOSTNAME..."
-sudo mkdir -p "$EDID_DIR"
-
-if [[ -n "${SRC_1:-}" ]]; then
-    sudo cp "$SRC_1" "$DEST_1"
-fi
-
-if [[ -n "${SRC_2:-}" ]]; then
-    sudo cp "$SRC_2" "$DEST_2"
-fi
+# --- INSTALL EDID BINARY ---
+echo "Installing EDID for $HOSTNAME..."
+sudo mkdir -p "$(dirname "$DEST")"
+sudo cp "$SRC" "$DEST"
 
 # --- CONFIGURE MKINITCPIO ---
-# Ensure the specific files for this host are in the initramfs
-echo "Updating mkinitcpio.conf FILES array..."
-{{ if eq .chezmoi.hostname "ml-server" -}}
-# Clean and add both files for ml-server
-sudo sed -i 's|FILES=(.*)|FILES=(/usr/lib/firmware/edid/edid-3x2.bin /usr/lib/firmware/edid/edid-1440p.bin)|' /etc/mkinitcpio.conf
-{{ else -}}
-# Standard single file for other hosts
-sudo sed -i "s|FILES=(.*)|FILES=($DEST_1)|" /etc/mkinitcpio.conf
-{{ end -}}
+if ! grep -q "/usr/lib/firmware/edid/edid.bin" /etc/mkinitcpio.conf; then
+    sudo sed -i 's|FILES=(|FILES=(/usr/lib/firmware/edid/edid.bin |' /etc/mkinitcpio.conf
+fi
 
 # --- PATCH LIMINE ---
 if [ -f "$LIMINE_DEFAULT" ]; then
-    # Wipe existing overrides to prevent duplicate/messy lines
-    echo "⚡ Patching Limine with: $TARGET_PARAMS"
-    
-    # Extract current args while stripping old EDID/Nvidia settings
-    CURRENT_ARGS=$(sed 's/BOOT_IMAGE=[^ ]* //g; s/initrd=[^ ]* //g; s/nvidia_drm.modeset=[^ ]* //g; s/drm.edid_firmware=[^ ]* //g' /proc/cmdline)
-    
-    # Add our new target params to the end of the file
-    echo "KERNEL_CMDLINE[default]=\"$CURRENT_ARGS $TARGET_PARAMS\"" | sudo tee -a "$LIMINE_DEFAULT" >/dev/null
-    
-    # Regenerate Bootloader and Initramfs
-    if command -v limine-mkinitcpio >/dev/null; then
-        sudo limine-mkinitcpio
-    else
-        sudo mkinitcpio -P
-        sudo limine-update
+    # Use a more generic grep to see if ANY firmware override is already there
+    if ! grep -q "drm.edid_firmware=" "$LIMINE_DEFAULT"; then
+        echo "⚡ Patching Limine for $HOSTNAME..."
+        CURRENT_ARGS=$(sed 's/BOOT_IMAGE=[^ ]* //g; s/initrd=[^ ]* //g; s/nvidia_drm.modeset=[^ ]* //g; s/drm.edid_firmware=[^ ]* //g' /proc/cmdline)
+        echo "KERNEL_CMDLINE[default]=\"$CURRENT_ARGS $TARGET_PARAMS\"" | sudo tee -a "$LIMINE_DEFAULT" >/dev/null
+        
+        # Regenerate
+        if command -v limine-mkinitcpio >/dev/null; then
+            sudo limine-mkinitcpio
+        else
+            sudo mkinitcpio -P
+            sudo limine-update
+        fi
     fi
-    
-    echo "✅ Setup complete. Please reboot to apply changes."
-else
-    echo "⚠️ $LIMINE_DEFAULT not found. Bootloader not patched."
 fi
