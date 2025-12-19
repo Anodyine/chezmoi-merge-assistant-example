@@ -7,13 +7,15 @@ LIMINE_DEFAULT="/etc/default/limine"
 
 # --- HOST CONFIGURATION ---
 {{ if eq .chezmoi.hostname "arch-lenovo" -}}
-SRC="{{ .chezmoi.sourceDir }}/files/edid/edid-arch-lenovo.bin"
+# Renamed from edid-arch-lenovo.bin
+SRC="{{ .chezmoi.sourceDir }}/files/edid/edid-1920-1440-56"
 TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=DP-2:edid/edid.bin"
-# hash: {{ include "files/edid/edid-arch-lenovo.bin" | sha256sum }}
+# hash: {{ include "files/edid/edid-1920-1440-56" | sha256sum }}
 {{ else if eq .chezmoi.hostname "ml-server" -}}
-SRC="{{ .chezmoi.sourceDir }}/files/edid/edid-ml-server.bin"
+# Renamed from edid-ml-server.bin
+SRC="{{ .chezmoi.sourceDir }}/files/edid/edid-1920-1280-60"
 TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=HDMI-A-2:edid/edid.bin"
-# hash: {{ include "files/edid/edid-ml-server.bin" | sha256sum }}
+# hash: {{ include "files/edid/edid-1920-1280-60" | sha256sum }}
 {{ else -}}
 echo "Host $HOSTNAME not configured for EDID override."
 exit 0
@@ -36,8 +38,6 @@ if [ -f "$LIMINE_DEFAULT" ]; then
         echo "⚡ Patching Limine for $HOSTNAME..."
         CURRENT_ARGS=$(sed 's/BOOT_IMAGE=[^ ]* //g; s/initrd=[^ ]* //g; s/nvidia_drm.modeset=[^ ]* //g; s/drm.edid_firmware=[^ ]* //g' /proc/cmdline)
         echo "KERNEL_CMDLINE[default]=\"$CURRENT_ARGS $TARGET_PARAMS\"" | sudo tee -a "$LIMINE_DEFAULT" >/dev/null
-        
-        # Regenerate
         if command -v limine-mkinitcpio >/dev/null; then
             sudo limine-mkinitcpio
         else
