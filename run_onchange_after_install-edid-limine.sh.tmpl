@@ -8,7 +8,6 @@ LIMINE_DEFAULT="/etc/default/limine"
 # --- HOST CONFIGURATION ---
 {{ if eq .chezmoi.hostname "arch-lenovo" -}}
 EDID_FILES=("files/edid/edid-1920-1440-56:edid.bin")
-# Single monitor syntax
 TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=DP-2:edid/edid.bin"
 # hash: {{ include "files/edid/edid-1920-1440-56" | sha256sum }}
 
@@ -17,8 +16,8 @@ EDID_FILES=(
     "files/edid/edid-1920-1440-56:edid-1440.bin"
     "files/edid/edid-1920-1280-60:edid-1280.bin"
 )
-# Multi-monitor syntax: comma-separated list under one parameter
-TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=HDMI-A-1:edid/edid-1440.bin,HDMI-A-2:edid/edid-1280.bin"
+# Swapped HDMI-A-1 for DP-3 for the 1440p firmware
+TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=DP-3:edid/edid-1440.bin,HDMI-A-2:edid/edid-1280.bin"
 # hash: {{ include "files/edid/edid-1920-1440-56" | sha256sum }}
 # hash: {{ include "files/edid/edid-1920-1280-60" | sha256sum }}
 
@@ -39,7 +38,6 @@ for entry in "${EDID_FILES[@]}"; do
     echo "Installing $DEST_NAME for $HOSTNAME..."
     sudo cp "$FULL_SRC" "$FULL_DEST"
 
-    # Ensure each firmware file is in mkinitcpio.conf
     if ! grep -q "$FULL_DEST" /etc/mkinitcpio.conf; then
         sudo sed -i "s|FILES=(|FILES=($FULL_DEST |" /etc/mkinitcpio.conf
     fi
@@ -47,21 +45,15 @@ done
 
 # --- PATCH LIMINE ---
 if [ -f "$LIMINE_DEFAULT" ]; then
-    # Clean baseline: strip out any previous attempts or duplicates
     BASE_ARGS=$(sed 's/BOOT_IMAGE=[^ ]* //g; s/initrd=[^ ]* //g; s/nvidia_drm.modeset=[^ ]* //g; s/drm.edid_firmware=[^ ]* //g' /proc/cmdline)
     NEW_LINE="KERNEL_CMDLINE[default]=\"$BASE_ARGS $TARGET_PARAMS\""
 
-    # Only apply if the config doesn't already match our target exactly
     if ! grep -qF "$NEW_LINE" "$LIMINE_DEFAULT"; then
-        echo "⚡ Updating Limine configuration with comma-separated EDIDs..."
+        echo "⚡ Updating Limine configuration (Applying 1440p to DP-3)..."
         
-        # Remove all existing KERNEL_CMDLINE[default] entries
         sudo sed -i '/^KERNEL_CMDLINE\[default\]=/d' "$LIMINE_DEFAULT"
-        
-        # Append the corrected single line
         echo "$NEW_LINE" | sudo tee -a "$LIMINE_DEFAULT" >/dev/null
 
-        # Trigger rebuild
         if command -v limine-mkinitcpio >/dev/null; then
             sudo limine-mkinitcpio
         else
