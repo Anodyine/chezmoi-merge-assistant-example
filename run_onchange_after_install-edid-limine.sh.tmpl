@@ -13,12 +13,12 @@ TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=DP-2:edid/edid.bin"
 
 {{ else if eq .chezmoi.hostname "ml-server" -}}
 EDID_FILES=(
-    "files/edid/edid-1920-1440-56:edid-1440.bin"
+    "files/edid/edid-1920-1440-60.bin:edid-1440-60.bin"
     "files/edid/edid-1920-1280-60:edid-1280.bin"
 )
-# Swapped HDMI-A-1 for DP-3 for the 1440p firmware
-TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=DP-3:edid/edid-1440.bin,HDMI-A-2:edid/edid-1280.bin"
-# hash: {{ include "files/edid/edid-1920-1440-56" | sha256sum }}
+
+TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=HDMI-A-1:edid/edid-1440-60.bin,HDMI-A-2:edid/edid-1280.bin"
+# hash: {{ include "files/edid/edid-1920-1440-60.bin" | sha256sum }}
 # hash: {{ include "files/edid/edid-1920-1280-60" | sha256sum }}
 
 {{ else -}}
@@ -49,8 +49,7 @@ if [ -f "$LIMINE_DEFAULT" ]; then
     NEW_LINE="KERNEL_CMDLINE[default]=\"$BASE_ARGS $TARGET_PARAMS\""
 
     if ! grep -qF "$NEW_LINE" "$LIMINE_DEFAULT"; then
-        echo "⚡ Updating Limine configuration (Applying 1440p to DP-3)..."
-        
+        echo "⚡ Updating Limine configuration"
         sudo sed -i '/^KERNEL_CMDLINE\[default\]=/d' "$LIMINE_DEFAULT"
         echo "$NEW_LINE" | sudo tee -a "$LIMINE_DEFAULT" >/dev/null
 
