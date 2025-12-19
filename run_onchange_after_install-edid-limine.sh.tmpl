@@ -2,42 +2,58 @@
 set -euo pipefail
 
 HOSTNAME="{{ .chezmoi.hostname }}"
-DEST="/usr/lib/firmware/edid/edid.bin"
+FW_DIR="/usr/lib/firmware/edid"
 LIMINE_DEFAULT="/etc/default/limine"
 
 # --- HOST CONFIGURATION ---
 {{ if eq .chezmoi.hostname "arch-lenovo" -}}
-# Renamed from edid-arch-lenovo.bin
-SRC="{{ .chezmoi.sourceDir }}/files/edid/edid-1920-1440-56"
+EDID_FILES=("files/edid/edid-1920-1440-56:edid.bin")
 TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=DP-2:edid/edid.bin"
 # hash: {{ include "files/edid/edid-1920-1440-56" | sha256sum }}
+
 {{ else if eq .chezmoi.hostname "ml-server" -}}
-# Renamed from edid-ml-server.bin
-SRC="{{ .chezmoi.sourceDir }}/files/edid/edid-1920-1280-60"
-TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=HDMI-A-2:edid/edid.bin"
+EDID_FILES=(
+    "files/edid/edid-1920-1440-56:edid-1440.bin"
+    "files/edid/edid-1920-1280-60:edid-1280.bin"
+)
+# Swapped HDMI-A-1 for DP-3 for the 1440p firmware
+TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=DP-3:edid/edid-1440.bin,HDMI-A-2:edid/edid-1280.bin"
+# hash: {{ include "files/edid/edid-1920-1440-56" | sha256sum }}
 # hash: {{ include "files/edid/edid-1920-1280-60" | sha256sum }}
+
 {{ else -}}
 echo "Host $HOSTNAME not configured for EDID override."
 exit 0
 {{ end -}}
 
-# --- INSTALL EDID BINARY ---
-echo "Installing EDID for $HOSTNAME..."
-sudo mkdir -p "$(dirname "$DEST")"
-sudo cp "$SRC" "$DEST"
+# --- INSTALL EDID BINARIES ---
+sudo mkdir -p "$FW_DIR"
 
-# --- CONFIGURE MKINITCPIO ---
-if ! grep -q "/usr/lib/firmware/edid/edid.bin" /etc/mkinitcpio.conf; then
-    sudo sed -i 's|FILES=(|FILES=(/usr/lib/firmware/edid/edid.bin |' /etc/mkinitcpio.conf
-fi
+for entry in "${EDID_FILES[@]}"; do
+    SRC_REL="${entry%%:*}"
+    DEST_NAME="${entry##*:}"
+    FULL_SRC="{{ .chezmoi.sourceDir }}/$SRC_REL"
+    FULL_DEST="$FW_DIR/$DEST_NAME"
+
+    echo "Installing $DEST_NAME for $HOSTNAME..."
+    sudo cp "$FULL_SRC" "$FULL_DEST"
+
+    if ! grep -q "$FULL_DEST" /etc/mkinitcpio.conf; then
+        sudo sed -i "s|FILES=(|FILES=($FULL_DEST |" /etc/mkinitcpio.conf
+    fi
+done
 
 # --- PATCH LIMINE ---
 if [ -f "$LIMINE_DEFAULT" ]; then
-    # Use a more generic grep to see if ANY firmware override is already there
-    if ! grep -q "drm.edid_firmware=" "$LIMINE_DEFAULT"; then
-        echo "⚡ Patching Limine for $HOSTNAME..."
-        CURRENT_ARGS=$(sed 's/BOOT_IMAGE=[^ ]* //g; s/initrd=[^ ]* //g; s/nvidia_drm.modeset=[^ ]* //g; s/drm.edid_firmware=[^ ]* //g' /proc/cmdline)
-        echo "KERNEL_CMDLINE[default]=\"$CURRENT_ARGS $TARGET_PARAMS\"" | sudo tee -a "$LIMINE_DEFAULT" >/dev/null
+    BASE_ARGS=$(sed 's/BOOT_IMAGE=[^ ]* //g; s/initrd=[^ ]* //g; s/nvidia_drm.modeset=[^ ]* //g; s/drm.edid_firmware=[^ ]* //g' /proc/cmdline)
+    NEW_LINE="KERNEL_CMDLINE[default]=\"$BASE_ARGS $TARGET_PARAMS\""
+
+    if ! grep -qF "$NEW_LINE" "$LIMINE_DEFAULT"; then
+        echo "⚡ Updating Limine configuration (Applying 1440p to DP-3)..."
+        
+        sudo sed -i '/^KERNEL_CMDLINE\[default\]=/d' "$LIMINE_DEFAULT"
+        echo "$NEW_LINE" | sudo tee -a "$LIMINE_DEFAULT" >/dev/null
+
         if command -v limine-mkinitcpio >/dev/null; then
             sudo limine-mkinitcpio
         else
