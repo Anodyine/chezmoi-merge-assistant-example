@@ -13,12 +13,10 @@ TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=DP-2:edid/edid.bin"
 
 {{ else if eq .chezmoi.hostname "ml-server" -}}
 EDID_FILES=(
-    "files/edid/edid-1920-1440-60.bin:edid-1440-60.bin"
     "files/edid/edid-1920-1280-60:edid-1280.bin"
 )
 
 TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=HDMI-A-2:edid/edid-1280.bin"
-# hash: {{ include "files/edid/edid-1920-1440-60.bin" | sha256sum }}
 # hash: {{ include "files/edid/edid-1920-1280-60" | sha256sum }}
 
 {{ else -}}
