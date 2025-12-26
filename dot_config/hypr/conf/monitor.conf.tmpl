@@ -1,11 +1,14 @@
 {{ if eq .chezmoi.hostname "arch-lenovo" -}}
-    source = ~/.config/hypr/conf/monitors/left_desk.conf
-    monitor=desc:BOE 0x0A1F,2560x1600@120,0x0,1.666667
-    monitor=desc:Google Inc. OMARCHY 0x00000001,1920x1440@56,auto,1.33334
+source = ~/.config/hypr/conf/monitors/left_desk.conf
+monitor=desc:BOE 0x0A1F,2560x1600@120,0x0,1.666667
+monitor=desc:Google Inc. OMARCHY 0x00000001,1920x1440@56,auto,1.33334
 {{ else if eq .chezmoi.hostname "ml-server" -}}
-    source = ~/.config/hypr/conf/monitors/right_desk.conf
+source = ~/.config/hypr/conf/monitors/right_desk.conf
+monitor=HDMI-A-2,1920x1280@60,auto,1
+monitor=DP-3,1600x1200@60,auto,1
+monitor=HDMI-A-3,2048x1536@60,auto,1.333334
 {{ else if eq .chezmoi.hostname "ml-server-2" -}}
-    source = ~/.config/hypr/conf/monitors/dance_room.conf
+source = ~/.config/hypr/conf/monitors/dance_room.conf
 {{ else -}}
-    source = ~/.config/hypr/conf/monitors/default.conf
+source = ~/.config/hypr/conf/monitors/default.conf
 {{ end }}
