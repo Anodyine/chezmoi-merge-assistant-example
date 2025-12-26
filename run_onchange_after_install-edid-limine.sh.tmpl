@@ -6,12 +6,7 @@ FW_DIR="/usr/lib/firmware/edid"
 LIMINE_DEFAULT="/etc/default/limine"
 
 # --- HOST CONFIGURATION ---
-{{ if eq .chezmoi.hostname "arch-lenovo" -}}
-EDID_FILES=("files/edid/edid-1920-1440-56:edid.bin")
-TARGET_PARAMS="nvidia_drm.modeset=1 drm.edid_firmware=DP-2:edid/edid.bin"
-# hash: {{ include "files/edid/edid-1920-1440-56" | sha256sum }}
-
-{{ else if eq .chezmoi.hostname "ml-server" -}}
+{{ if eq .chezmoi.hostname "ml-server" -}}
 EDID_FILES=(
     "files/edid/edid-1920-1280-60:edid-1280.bin"
 )
