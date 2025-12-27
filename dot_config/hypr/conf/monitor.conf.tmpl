@@ -7,6 +7,8 @@ source = ~/.config/hypr/conf/monitors/right_desk.conf
 monitor=HDMI-A-2,1920x1280@60,auto,1
 monitor=DP-3,1600x1200@60,auto,1
 monitor=HDMI-A-3,2048x1536@60,auto,1.333334
+{{ else if eq .chezmoi.hostname "ml-server-1" -}}
+source = ~/.config/hypr/conf/monitors/left_desk.conf
 {{ else if eq .chezmoi.hostname "ml-server-2" -}}
 source = ~/.config/hypr/conf/monitors/dance_room.conf
 {{ else -}}
