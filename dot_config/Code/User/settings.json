@@ -1,6 +1,6 @@
 {
   "update.mode": "none", 
-  "workbench.colorTheme": "Monokai Pro (Filter Ristretto)",
+  "workbench.colorTheme": "Sonokai Espresso",
   "vim.handleKeys": {
       "<C-c>": false,
       "<C-v>": false,
@@ -11,6 +11,6 @@
       "<C-z>": false
   },
   "keyboard.dispatch": "keyCode",
-  "workbench.iconTheme": "Monokai Pro (Filter Ristretto) Icons",
+  "workbench.iconTheme": "Sonokai Espresso Icons",
   "terminal.integrated.defaultProfile.linux": "zsh",
 }
