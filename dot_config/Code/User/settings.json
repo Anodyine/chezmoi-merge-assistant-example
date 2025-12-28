@@ -1,6 +1,6 @@
 {
   "update.mode": "none", 
-  "workbench.colorTheme": "Sonokai Espresso",
+  "workbench.colorTheme": "Monokai Pro (Filter Ristretto)",
   "vim.handleKeys": {
       "<C-c>": false,
       "<C-v>": false,
