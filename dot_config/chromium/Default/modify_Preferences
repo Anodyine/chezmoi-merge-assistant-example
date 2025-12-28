@@ -1,0 +1,17 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- $prefs := .chezmoi.stdin | fromJson -}}
+
+{{- /* Force Extension Theme ID */ -}}
+{{- $prefs = setValueAtPath "extensions.theme.id" "user_color_theme_id" $prefs -}}
+
+{{- /* Apply the Colors - sometimes these need to be integers */ -}}
+{{- $prefs = setValueAtPath "browser.theme.color_variant2" (int 2) $prefs -}}
+{{- $prefs = setValueAtPath "browser.theme.user_color2" (int -205879) $prefs -}}
+
+{{- /* Ensure System Theme is disabled so custom colors show */ -}}
+{{- $prefs = setValueAtPath "extensions.theme.system_theme" (int 0) $prefs -}}
+
+{{- /* Title Bar */ -}}
+{{- $prefs = setValueAtPath "browser.custom_chrome_frame" false $prefs -}}
+
+{{- $prefs | toPrettyJson -}}
