@@ -12,7 +12,8 @@ monitor=eDP-1,2400x1600,0x0,1.333334
 monitor=DP-3,2048x1536@60,-1536x0,1.333334 # left
 {{ else if eq .chezmoi.hostname "ml-server" -}}
 source = ~/.config/hypr/conf/monitors/right_desk.conf
-monitor=DP-3,2048x1536@60,-1536x0,1.333334 # left
+#monitor=DP-3,1600x1200@60,-1600x0,1 # left
+monitor=DP-3,1600x1200@60,auto,1 # right
 {{ else if eq .chezmoi.hostname "ml-server-1" -}}
 source = ~/.config/hypr/conf/monitors/left_desk.conf
 {{ else if eq .chezmoi.hostname "ml-server-2" -}}
