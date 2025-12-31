@@ -1,5 +1,10 @@
 {{- /* chezmoi:modify-template */ -}}
-{{- $prefs := .chezmoi.stdin | fromJson -}}
+{{- $input := .chezmoi.stdin | trim -}}
+{{- $prefs := dict -}}
+
+{{- if $input -}}
+  {{- $prefs = $input | fromJson -}}
+{{- end -}}
 
 {{- $prefs = setValueAtPath "extensions.theme.id" "" $prefs -}}
 {{- $prefs = setValueAtPath "extensions.theme.system_theme" (int 1) $prefs -}}
