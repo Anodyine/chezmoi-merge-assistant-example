@@ -32,7 +32,7 @@
   "animations.Enabled": true,
   "animations.Install-Method": "Custom CSS and JS",
   "animations.CursorAnimationOptions": {
-    "TrailLength": 25 
+    "TrailLength": 15 
   },
   "animations.CursorAnimation": true,
   "terminal.integrated.cursorBlinking": true,
