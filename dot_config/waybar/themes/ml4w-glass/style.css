@@ -28,7 +28,7 @@ window#waybar {
     border: 1px solid transparent;	
     opacity:0.8;
     padding:0px;
-    margin:2px;
+    margin:10px;
     box-shadow: 0 0 6 @shadow;
 }
 
@@ -40,7 +40,7 @@ window#waybar {
     border: 1px solid transparent;	
     opacity:0.8;
     padding:0px;
-    margin:2px;
+    margin:10px;
     box-shadow: 0 0 6 @shadow;
 }
 
@@ -51,7 +51,7 @@ window#waybar {
         linear-gradient(@primary,@on_primary) border-box;
     border: 1px solid transparent;	
     opacity:0.8;
-    margin:2px;
+    margin:10px;
     box-shadow: 0 0 6 @shadow;
 }
 
@@ -83,7 +83,7 @@ label.module:hover {
  * ----------------------------------------------------- */
 
 #workspaces {
-    padding: 5px 3px 5px 0px;
+    padding: 5px 3px 5px 3px;
 }
 
 #workspaces button {
