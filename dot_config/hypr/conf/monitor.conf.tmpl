@@ -6,17 +6,23 @@ monitor=desc:BOE 0x0A1F,2560x1600@60,0x0,1.333334
 #monitor=desc:Audio Processing Technology,2880x1800@120,-1920x0,1.5 # left
 monitor=desc:Audio Processing Technology,2880x1800@120,auto,1.5 # right
 {{ else if eq .chezmoi.hostname "arch-surface" -}}
-source = ~/.config/hypr/conf/monitors/left_desk.conf
+#source = ~/.config/hypr/conf/monitors/left_desk.conf
 
-monitor=eDP-1,preferred,0x0,1.6
-#monitor=DP-2,3440x1440@60,1840x-1152,1.333334
-#monitor=DP-3,5120x1440@60,1440x0,1.25
+# built in
+monitor=eDP-1,2400x1600@60,0x0,1.33
+
+# desk
+monitor=desc:LG Electronics LG ULTRAGEAR,3440x1440@100,2360x-1640,1
+monitor=desc:Samsung Electric Company Odyssey G95C,5120x1440@240,1800x-200,1
+
 # ipad
 #monitor=DP-3,2048x1536@60,auto,1.3333334 # right
 #monitor=DP-3,2048x1536@60,0x-1152,1.3333334 # above
 #monitor=DP-3,2048x1536@60,-1536x0,1.3333334 # left
+
 # uperfect
-monitor=DP-3,2880x1800@60,auto,1.6 # right
+monitor=desc:Audio Processing Technology,2880x1800@60,auto,1.6 # right
+
 {{ else if eq .chezmoi.hostname "ml-server" -}}
 source = ~/.config/hypr/conf/monitors/right_desk.conf
 #monitor=DP-3,2048x1536@60,-1536x0,1.333334 # left
