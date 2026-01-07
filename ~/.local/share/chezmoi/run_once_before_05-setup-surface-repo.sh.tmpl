@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Only run this script if the hostname matches
+{{ if eq .chezmoi.hostname "arch-surface" -}}
+
+set -e 
+
+echo "🚀 Starting Full Surface Linux Automation..."
+
+# 1. GPG Key Setup
+if ! pacman-key -list-keys 56C464BAAC421453 >/dev/null 2>&1; then
+    echo "📥 Importing Surface Linux GPG key..."
+    curl -s https://raw.githubusercontent.com/linux-surface/linux-surface/master/pkg/keys/surface.asc | sudo pacman-key --add -
+    sudo pacman-key --lsign-key 56C464BAAC421453
+fi
+
+# 2. Repository Setup
+if ! grep -q "\[linux-surface\]" /etc/pacman.conf; then
+    echo "📝 Adding [linux-surface] repository..."
+    echo -e "\n[linux-surface]\nServer = https://pkg.surfacelinux.com/arch/" | sudo tee -a /etc/pacman.conf
+    sudo pacman -Syu --noconfirm
+fi
+
+# 3. Package Installation
+# We add 'limine-mkinitcpio-hook' from the AUR (or your preferred helper) 
+# to handle the automated config generation.
+echo "📦 Installing Surface Kernel and Automation Tools..."
+# Note: I am assuming you have 'yay' or 'paru' available as per your tree's 'packages.yay.list'
+yay -S --needed --noconfirm linux-surface linux-surface-headers iptsd linux-firmware-intel limine-mkinitcpio-hook
+
+# 4. Enable Touchscreen Service
+echo "☝️  Enabling iptsd..."
+sudo systemctl enable --now iptsd
+
+# 5. Automated Limine Configuration
+# Instead of manual patching, we use the tools provided in the documentation
+echo "🔧 Generating Limine configuration via limine-update..."
+
+# Ensure the ESP is detected properly
+# limine-update will generate/update /boot/limine.conf automatically
+sudo limine-update
+
+# 6. Windows/Linux Time Sync fix
+echo "🕒 Setting RTC to localtime for dual-boot compatibility..."
+sudo timedatectl set-local-rtc 1 --adjust-system-clock
+
+echo "🎉 Setup complete! limine-update has detected the Surface kernel."
+echo "   Your boot menu will now include 'Arch Linux (linux-surface)'."
+
+{{ end -}}
