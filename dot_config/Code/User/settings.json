@@ -41,5 +41,6 @@
   "terminal.integrated.gpuAcceleration": "on",
   "terminal.external.linuxExec": "kitty",
   "terminal.explorerKind": "external",
-  "workbench.iconTheme": "Monokai Pro (Filter Ristretto) Icons"
+  "workbench.iconTheme": "Monokai Pro (Filter Ristretto) Icons",
+  "python.analysis.typeCheckingMode": "standard"
 }
