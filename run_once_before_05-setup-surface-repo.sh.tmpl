@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-echo "🚀 Starting Full Surface Linux Automation..."
+echo "🚀 Starting Optimized Surface Linux Automation..."
 
 # 1. GPG Key Setup
 if ! pacman-key -list-keys 56C464BAAC421453 >/dev/null 2>&1; then
@@ -18,50 +18,43 @@ fi
 if ! grep -q "\[linux-surface\]" /etc/pacman.conf; then
     echo "📝 Adding [linux-surface] repository..."
     echo -e "\n[linux-surface]\nServer = https://pkg.surfacelinux.com/arch/" | sudo tee -a /etc/pacman.conf
-    sudo pacman -Syu --noconfirm
+    sudo pacman -Sy
 fi
 
-# 3. Package Installation
-# Installs kernel and the limine-entry-tool (which provides limine-update/limine-mkinitcpio)
-echo "📦 Installing Surface Kernel and Automation Tools..."
-yay -S --needed --noconfirm linux-surface linux-surface-headers iptsd linux-firmware-intel limine-mkinitcpio-hook
-
-# 4. Patch Limine Kernel Parameters
-# We modify /etc/default/limine so that limine-update picks up the shutdown fix
+# 3. Patch Limine Parameters BEFORE Installation
+# Doing this first means the pacman hook will only run ONCE and use these params.
 LIMINE_DEFAULT="/etc/default/limine"
 TARGET_PARAM="pci=hpiosize=0"
 
 if [ -f "$LIMINE_DEFAULT" ]; then
-    echo "⚡ Patching $LIMINE_DEFAULT with shutdown fix..."
-    
-    # Clean existing param if present to avoid duplicates, then append
-    # This reads current /proc/cmdline (minus transient vars) and adds our target
-    BASE_ARGS=$(sed 's/BOOT_IMAGE=[^ ]* //g; s/initrd=[^ ]* //g; s/pci=hpiosize=0//g' /proc/cmdline | xargs)
-    NEW_LINE="KERNEL_CMDLINE[default]=\"$BASE_ARGS $TARGET_PARAM\""
-
-    # Remove existing default line and replace with the new one
-    sudo sed -i '/^KERNEL_CMDLINE\[default\]=/d' "$LIMINE_DEFAULT"
-    echo "$NEW_LINE" | sudo tee -a "$LIMINE_DEFAULT" >/dev/null
+    if ! grep -q "$TARGET_PARAM" "$LIMINE_DEFAULT"; then
+        echo "⚡ Patching $LIMINE_DEFAULT with shutdown fix..."
+        # Get current cmdline, strip out transient/duplicate args
+        BASE_ARGS=$(sed 's/BOOT_IMAGE=[^ ]* //g; s/initrd=[^ ]* //g; s/pci=hpiosize=0//g' /proc/cmdline | xargs)
+        sudo sed -i '/^KERNEL_CMDLINE\[default\]=/d' "$LIMINE_DEFAULT"
+        echo "KERNEL_CMDLINE[default]=\"$BASE_ARGS $TARGET_PARAM\"" | sudo tee -a "$LIMINE_DEFAULT" >/dev/null
+    fi
 fi
 
-# 5. Generate Config & Initramfs
-echo "🔧 Regenerating initramfs and Limine config..."
-if command -v limine-mkinitcpio >/dev/null; then
-    sudo limine-mkinitcpio
-else
-    sudo mkinitcpio -P
-    sudo limine-update
-fi
+# 4. Package Installation
+# This triggers the limine-mkinitcpio hook AUTOMATICALLY during install.
+echo "📦 Installing Surface Kernel and Tools..."
+# We use --needed so it doesn't try to reinstall things that are already there
+yay -S --needed --noconfirm linux-surface linux-surface-headers iptsd linux-firmware-intel limine-mkinitcpio-hook
 
-# 6. Services & Hardware fixes
-echo "☝️  Enabling iptsd for touch support..."
-sudo systemctl enable --now iptsd
+# 5. Handle Touchscreen Support
+# Since iptsd is D-Bus activated, we don't 'enable' it. 
+# We just ensure systemd and udev are refreshed so they see the new touch drivers.
+echo "☝️  Refreshing hardware triggers for touch support..."
+sudo systemctl daemon-reload
+sudo udevadm control --reload-rules && sudo udevadm trigger
 
+# 6. Windows/Linux Time Sync fix
 echo "🕒 Setting RTC to localtime for dual-boot compatibility..."
 sudo timedatectl set-local-rtc 1 --adjust-system-clock
 
-echo "🎉 Surface setup complete! pci=hpiosize=0 has been added to your boot config."
+echo "🎉 Surface setup complete! Parameters applied and touch drivers ready."
 
 {{ else -}}
-echo "Host {{ .chezmoi.hostname }} is not arch-surface. Skipping Surface setup."
+echo "Skipping Surface setup for host {{ .chezmoi.hostname }}."
 {{ end -}}
