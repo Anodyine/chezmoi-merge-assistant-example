@@ -1,6 +1,6 @@
 #!/bin/bash
-# SDDM Autologin: Omarchy Implementation (No-Fail Version)
-set -u # Removed -e to prevent exit on non-critical errors
+# SDDM Autologin: Host-Aware Implementation
+set -uo pipefail
 
 TARGET_DIR="/etc/sddm.conf.d"
 AUTOLOGIN_FILE="$TARGET_DIR/autologin.conf"
@@ -12,17 +12,26 @@ echo "🚀 Configuring SDDM Autologin for $HOSTNAME..."
 # 1. Ensure directory exists
 sudo mkdir -p "$TARGET_DIR"
 
-# 2. Session Detection
-if [ -f "/usr/share/wayland-sessions/hyprland-uwsm.desktop" ]; then
-    SESSION="hyprland-uwsm.desktop"
-else
-    SESSION="hyprland.desktop"
-fi
+# 2. Host-Specific Session Detection
+# On the Surface, we want the stability of uwsm.
+# On everything else, we go back to your "known good" hyprland session.
+{{ if eq .chezmoi.hostname "arch-surface" -}}
+    # Check for uwsm first for Surface stability, fall back to hyprland
+    if [ -f "/usr/share/wayland-sessions/hyprland-uwsm.desktop" ]; then
+        SESSION="hyprland-uwsm"
+    else
+        SESSION="hyprland"
+    fi
+{{ else -}}
+    # For desktop/server, we use your original working session
+    SESSION="hyprland"
+{{ end -}}
 
 # 3. Create temp files to avoid pipe issues with sudo
 TEMP_AUTO=$(mktemp)
 TEMP_GEN=$(mktemp)
 
+# Autologin Config (Note: NO .desktop suffix)
 cat <<EOF > "$TEMP_AUTO"
 [Autologin]
 User={{ .chezmoi.username }}
@@ -30,21 +39,28 @@ Session=$SESSION
 Relogin=false
 EOF
 
+# General Config 
+# (Only applied if it's the Surface to ensure it forces Wayland for the touch screen)
+{{ if eq .chezmoi.hostname "arch-surface" -}}
 cat <<EOF > "$TEMP_GEN"
 [General]
 DisplayServer=wayland
 GreeterEnvironment=QT_WAYLAND_SHELL_INTEGRATION=layer-shell
+InputMethod=
 EOF
+{{ else -}}
+# On other machines, we make sure general.conf is minimal or empty
+# to avoid interfering with existing GPU drivers.
+cat <<EOF > "$TEMP_GEN"
+[General]
+InputMethod=
+EOF
+{{ end -}}
 
-# 4. Move files into place (This is more reliable than tee)
+# 4. Move files into place and enforce root ownership
 sudo mv "$TEMP_AUTO" "$AUTOLOGIN_FILE"
 sudo mv "$TEMP_GEN" "$GENERAL_FILE"
+sudo chown root:root "$AUTOLOGIN_FILE" "$GENERAL_FILE"
 sudo chmod 644 "$AUTOLOGIN_FILE" "$GENERAL_FILE"
 
-# 5. Cleanup only if files exist to avoid "find" errors
-# We do this one by one to ensure no "exit 1" from find
-if [ -f "$TARGET_DIR/kde_settings.conf" ]; then sudo rm -f "$TARGET_DIR/kde_settings.conf"; fi
-if [ -f "$TARGET_DIR/default.conf" ]; then sudo rm -f "$TARGET_DIR/default.conf"; fi
-
 echo "✅ SDDM configured (Session: $SESSION)."
-exit 0
