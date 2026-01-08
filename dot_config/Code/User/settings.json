@@ -42,5 +42,6 @@
   "terminal.external.linuxExec": "kitty",
   "terminal.explorerKind": "external",
   "workbench.iconTheme": "Monokai Pro (Filter Octagon) Icons",
-  "python.analysis.typeCheckingMode": "standard"
+  "python.analysis.typeCheckingMode": "standard",
+  "editor.fontSize": 16
 }
