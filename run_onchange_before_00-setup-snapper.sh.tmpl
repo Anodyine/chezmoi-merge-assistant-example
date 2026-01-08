@@ -1,118 +1,47 @@
 #!/bin/bash
+# Unified Boot & Snapshot Management
+set -euo pipefail
 
-# Title: Automated Limine & Snapper Setup (Silent & Fixed + Retention)
-# Description: Installs hooks, configures Limine/Snapper, sets retention, and regenerates images.
+HOSTNAME="{{ .chezmoi.hostname }}"
+echo "🚀 Starting Boot/Snapshot Config for $HOSTNAME..."
 
-set -e
+# --- 1. AUR Helper & Packages ---
+AUR_HELPER=$(command -v paru || command -v yay)
+$AUR_HELPER -S --needed --noconfirm limine-snapper-sync snap-pac limine-mkinitcpio-hook
 
-# --- 1. Helper Detection & Auto-Install ---
-if command -v paru &> /dev/null; then
-    AUR_HELPER="paru"
-elif command -v yay &> /dev/null; then
-    AUR_HELPER="yay"
-else
-    echo "Installing yay..."
-    sudo pacman -S --needed --noconfirm git base-devel
-    TEMP_DIR=$(mktemp -d)
-    git clone https://aur.archlinux.org/yay-bin.git "$TEMP_DIR/yay-bin"
-    (cd "$TEMP_DIR/yay-bin" && makepkg -si --noconfirm)
-    rm -rf "$TEMP_DIR"
-    AUR_HELPER="yay"
-fi
-
-# --- 2. Install Packages (Silent) ---
-echo "Installing dependencies..."
-$AUR_HELPER -S --needed --noconfirm --answerclean None --answerdiff None \
-    limine-snapper-sync snap-pac limine-mkinitcpio-hook
-
-# --- 3. Configure Limine ---
-LIMINE_CONF="/boot/EFI/arch-limine/limine.conf"
-
-if [ -f "$LIMINE_CONF" ]; then
-    if grep -q "//Snapshots" "$LIMINE_CONF"; then
-        echo "Limine config already contains //Snapshots. Skipping."
-    else
-        echo "Injecting //Snapshots directive..."
-        echo -e "\n//Snapshots" | sudo tee -a "$LIMINE_CONF" > /dev/null
-    fi
-else
-    echo "Error: $LIMINE_CONF not found."
-    exit 1
-fi
-
-# --- 4. Central Configuration ---
+# --- 2. Limine/Snapper Defaults ---
 DEFAULT_CONF="/etc/default/limine"
-echo "Configuring global defaults..."
+MASTER_CONF="/boot/limine.conf"
+
 sudo touch "$DEFAULT_CONF"
+for var in "LIMINE_CONFIG=\"$MASTER_CONF\"" "ROOT_SNAPSHOTS_PATH=\"/@snapshots\"" "MAX_SNAPSHOT_ENTRIES=30"; do
+    key=$(echo $var | cut -d= -f1)
+    sudo sed -i "/^$key=/d" "$DEFAULT_CONF"
+    echo "$var" | sudo tee -a "$DEFAULT_CONF" > /dev/null
+done
 
-if grep -q "LIMINE_CONFIG=" "$DEFAULT_CONF"; then
-    sudo sed -i "s|.*LIMINE_CONFIG=.*|LIMINE_CONFIG=\"$LIMINE_CONF\"|" "$DEFAULT_CONF"
-else
-    echo "LIMINE_CONFIG=\"$LIMINE_CONF\"" | sudo tee -a "$DEFAULT_CONF" > /dev/null
-fi
+{{ if eq .chezmoi.hostname "arch-surface" -}}
+# Hardware-specific boot args
+BASE_ARGS="root=PARTUUID=b5133817-b3a7-47c7-8400-48ef72672a80 zswap.enabled=0 rootflags=subvol=@ rw rootfstype=btrfs"
+sudo sed -i '/^KERNEL_CMDLINE/d' "$DEFAULT_CONF"
+echo "KERNEL_CMDLINE[default]=\"$BASE_ARGS pci=hpiosize=0 pcie_aspm=off intel_iommu=on,igfx_off usb4_port_reset\"" | sudo tee -a "$DEFAULT_CONF" >/dev/null
+echo "DEFAULT_ENTRY=3" | sudo tee -a "$DEFAULT_CONF" >/dev/null
+{{ end -}}
 
-SNAPSHOTS_PATH="/@snapshots"
-echo "Setting ROOT_SNAPSHOTS_PATH=$SNAPSHOTS_PATH to fix synchronization error."
-if grep -q "ROOT_SNAPSHOTS_PATH=" "$DEFAULT_CONF"; then
-    # Update existing line
-    sudo sed -i "s|.*ROOT_SNAPSHOTS_PATH=.*|ROOT_SNAPSHOTS_PATH=\"$SNAPSHOTS_PATH\"|" "$DEFAULT_CONF"
-else
-    # Add new line
-    echo "ROOT_SNAPSHOTS_PATH=\"$SNAPSHOTS_PATH\"" | sudo tee -a "$DEFAULT_CONF" > /dev/null
-fi
+# --- 3. Regeneration ---
+sudo limine-mkinitcpio 
 
-# --- 5. Enable Overlay Hook ---
-MKINIT_CONF="/etc/mkinitcpio.conf"
-HOOK_NAME="btrfs-overlayfs"
+{{ if eq .chezmoi.hostname "arch-surface" -}}
+sudo sed -i 's/^default_entry: .*/default_entry: 3/' "$MASTER_CONF"
+{{ end -}}
 
-if grep -q "$HOOK_NAME" "$MKINIT_CONF"; then
-    echo "Hook '$HOOK_NAME' already active."
-else
-    echo "Adding '$HOOK_NAME' to mkinitcpio.conf..."
-    sudo sed -i "s/filesystems/filesystems $HOOK_NAME/" "$MKINIT_CONF"
-fi
+# FAT32 Mirroring
+for dest in "/boot/EFI/arch-limine/limine.conf" "/boot/EFI/limine/limine.conf"; do
+    sudo mkdir -p "$(dirname "$dest")"
+    sudo cp "$MASTER_CONF" "$dest"
+done
 
-# --- 6. Configure Snapper Retention (Balanced / 2TB Policy) ---
-if [ ! -f "/etc/snapper/configs/root" ]; then
-    echo "   Config missing. preparing layout..."
-    
-    # Unmount if strictly necessary to recreate layout
-    if mountpoint -q /.snapshots; then
-        sudo umount /.snapshots
-    fi
-
-    # Remove directory to allow snapper to initialize
-    if [ -d "/.snapshots" ]; then
-        sudo rm -rf /.snapshots
-    fi
-
-    sudo snapper -c root create-config /
-    
-    # Fix the directory structure immediately after creation
-    sudo rm -rf /.snapshots
-    sudo mkdir -p /.snapshots
-    sudo mount -a
-else
-    echo "   Snapper config already exists. Skipping init."
-fi
-
-echo "Setting Snapper retention limits (Balanced Policy)..."
-# Hourly: 10, Daily: 21 (3 weeks), Weekly: 4 (1 month), Monthly: 2, Yearly: 0
-sudo snapper -c root set-config \
-    TIMELINE_LIMIT_HOURLY="10" \
-    TIMELINE_LIMIT_DAILY="21" \
-    TIMELINE_LIMIT_WEEKLY="4" \
-    TIMELINE_LIMIT_MONTHLY="2" \
-    TIMELINE_LIMIT_YEARLY="0"
-
-# --- 7. Finalize ---
-echo "Regenerating initramfs and updating Limine..."
-sudo limine-mkinitcpio
-
-echo "Enabling automation..."
 sudo systemctl enable --now limine-snapper-sync.service
-
-echo "Running initial snapshot sync..."
 sudo limine-snapper-sync
 
-echo "SUCCESS: Snapshot booting configured non-interactively."
+echo "🎉 Boot/Snapshot Initialization complete!"

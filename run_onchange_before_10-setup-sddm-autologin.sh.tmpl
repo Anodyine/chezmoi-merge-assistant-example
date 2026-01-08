@@ -1,34 +1,50 @@
 #!/bin/bash
+# SDDM Autologin: Omarchy Implementation (No-Fail Version)
+set -u # Removed -e to prevent exit on non-critical errors
 
-# ---------------------------------------------------------------------------------
-# SDDM Autologin Configuration via Chezmoi
-# ---------------------------------------------------------------------------------
+TARGET_DIR="/etc/sddm.conf.d"
+AUTOLOGIN_FILE="$TARGET_DIR/autologin.conf"
+GENERAL_FILE="$TARGET_DIR/general.conf"
+HOSTNAME="{{ .chezmoi.hostname }}"
 
-# 1. Define the target file
-TARGET_FILE="/etc/sddm.conf.d/autologin.conf"
-TARGET_DIR=$(dirname "$TARGET_FILE")
+echo "🚀 Configuring SDDM Autologin for $HOSTNAME..."
 
-# 2. Define the content dynamically
-# We use a variable so we can hash it for chezmoi to detect changes
-read -r -d '' CONFIG_CONTENT <<EOF
-[Autologin]
-User={{ .chezmoi.username }}
-Session=hyprland
-EOF
+# 1. Ensure directory exists
+sudo mkdir -p "$TARGET_DIR"
 
-# 3. Hash check (Important for chezmoi)
-# This comment tells chezmoi to re-run this script only if the content below changes
-# config_hash: {{ $config_content := "[Autologin]\nUser=" | print .chezmoi.username "\nSession=hyprland" }}{{ $config_content | sha256sum }}
-
-echo "Configuring SDDM Autologin for user: {{ .chezmoi.username }}"
-
-# 4. Create the directory if it's missing
-if [ ! -d "$TARGET_DIR" ]; then
-    echo "Creating directory $TARGET_DIR..."
-    sudo mkdir -p "$TARGET_DIR"
+# 2. Session Detection
+if [ -f "/usr/share/wayland-sessions/hyprland-uwsm.desktop" ]; then
+    SESSION="hyprland-uwsm.desktop"
+else
+    SESSION="hyprland.desktop"
 fi
 
-# 5. Write the file safely using sudo
-echo "$CONFIG_CONTENT" | sudo tee "$TARGET_FILE" > /dev/null
+# 3. Create temp files to avoid pipe issues with sudo
+TEMP_AUTO=$(mktemp)
+TEMP_GEN=$(mktemp)
 
-echo "SDDM autologin configured successfully."
+cat <<EOF > "$TEMP_AUTO"
+[Autologin]
+User={{ .chezmoi.username }}
+Session=$SESSION
+Relogin=false
+EOF
+
+cat <<EOF > "$TEMP_GEN"
+[General]
+DisplayServer=wayland
+GreeterEnvironment=QT_WAYLAND_SHELL_INTEGRATION=layer-shell
+EOF
+
+# 4. Move files into place (This is more reliable than tee)
+sudo mv "$TEMP_AUTO" "$AUTOLOGIN_FILE"
+sudo mv "$TEMP_GEN" "$GENERAL_FILE"
+sudo chmod 644 "$AUTOLOGIN_FILE" "$GENERAL_FILE"
+
+# 5. Cleanup only if files exist to avoid "find" errors
+# We do this one by one to ensure no "exit 1" from find
+if [ -f "$TARGET_DIR/kde_settings.conf" ]; then sudo rm -f "$TARGET_DIR/kde_settings.conf"; fi
+if [ -f "$TARGET_DIR/default.conf" ]; then sudo rm -f "$TARGET_DIR/default.conf"; fi
+
+echo "✅ SDDM configured (Session: $SESSION)."
+exit 0
