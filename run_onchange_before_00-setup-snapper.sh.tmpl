@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unified Boot & Snapshot Management
+# Unified Boot & Snapshot Management - Source-First & Host-Aware Version
 set -euo pipefail
 
 HOSTNAME="{{ .chezmoi.hostname }}"
@@ -9,19 +9,17 @@ echo "🚀 Starting Boot/Snapshot Config for $HOSTNAME..."
 AUR_HELPER=$(command -v paru || command -v yay)
 $AUR_HELPER -S --needed --noconfirm limine-snapper-sync snap-pac limine-mkinitcpio-hook
 
-# --- 2. Limine/Snapper Defaults ---
+# --- 2. Limine/Snapper Defaults (The SOURCE of truth) ---
 DEFAULT_CONF="/etc/default/limine"
 MASTER_CONF="/boot/limine.conf"
 
 sudo touch "$DEFAULT_CONF"
 
-# Force text mode to prevent UEFI/USB initialization crashes
+# Standard variables for all hosts
 VARS=(
     "LIMINE_CONFIG=\"$MASTER_CONF\""
     "ROOT_SNAPSHOTS_PATH=\"/@snapshots\""
     "MAX_SNAPSHOT_ENTRIES=30"
-    "TERMINAL_MODE=text"
-    "GRAPHICS=no"
 )
 
 for var in "${VARS[@]}"; do
@@ -31,36 +29,43 @@ for var in "${VARS[@]}"; do
 done
 
 {{ if eq .chezmoi.hostname "arch-surface" -}}
-# --- 3. Surface Hardware-specific boot args ---
+# --- 3. Surface-Specific Configuration ---
+
+# A. USB Crash & Graphics Stability
+# These force text mode and skip the countdown window to prevent the 5s crash
+SURFACE_VARS=(
+    "TERMINAL_MODE=text"
+    "GRAPHICS=no"
+    "TIMEOUT=0"
+    "DEFAULT_ENTRY=3"
+)
+
+for var in "${SURFACE_VARS[@]}"; do
+    key=$(echo $var | cut -d= -f1)
+    sudo sed -i "/^$key=/d" "$DEFAULT_CONF"
+    echo "$var" | sudo tee -a "$DEFAULT_CONF" > /dev/null
+done
+
+# B. Kernel Boot Arguments
 BASE_ARGS="root=PARTUUID=b5133817-b3a7-47c7-8400-48ef72672a80 zswap.enabled=0 rootflags=subvol=@ rw rootfstype=btrfs"
 sudo sed -i '/^KERNEL_CMDLINE/d' "$DEFAULT_CONF"
 echo "KERNEL_CMDLINE[default]=\"$BASE_ARGS pci=hpiosize=0 pcie_aspm=off intel_iommu=on,igfx_off usb4_port_reset\"" | sudo tee -a "$DEFAULT_CONF" >/dev/null
 
-# Set Default Entry
-if ! grep -q "^DEFAULT_ENTRY=" "$DEFAULT_CONF"; then
-    echo "DEFAULT_ENTRY=3" | sudo tee -a "$DEFAULT_CONF" >/dev/null
-else
-    sudo sed -i 's/^DEFAULT_ENTRY=.*/DEFAULT_ENTRY=3/' "$DEFAULT_CONF"
-fi
+{{ else -}}
+# --- 4. Standard Host Configuration (e.g., ml-server) ---
+# Ensure normal hosts have a visible menu and graphical support if desired
+sudo sed -i "/^TIMEOUT=/d" "$DEFAULT_CONF"
+echo "TIMEOUT=5" | sudo tee -a "$DEFAULT_CONF" > /dev/null
 {{ end -}}
 
-# --- 4. Regeneration ---
+# --- 5. Regeneration (The GENERATOR) ---
+# This command reads /etc/default/limine and WRITES the generated file.
+echo "⚙️  Regenerating bootloader configuration from source..."
 sudo limine-mkinitcpio 
 
-{{ if eq .chezmoi.hostname "arch-surface" -}}
-# Force manual override for stability
-sudo sed -i 's/^default_entry: .*/default_entry: 3/' "$MASTER_CONF"
-if ! grep -q "term_on_graphic: no" "$MASTER_CONF"; then
-    echo "term_on_graphic: no" | sudo tee -a "$MASTER_CONF" > /dev/null
-fi
-{{ end -}}
-
-# --- 5. FAT32 Mirroring ---
-for dest in "/boot/EFI/arch-limine/limine.conf" "/boot/EFI/limine/limine.conf"; do
-    sudo mkdir -p "$(dirname "$dest")"
-    sudo cp "$MASTER_CONF" "$dest"
-done
-
+# --- 6. Activation ---
 sudo systemctl daemon-reload
 sudo systemctl enable --now limine-snapper-sync.service
 sudo limine-snapper-sync
+
+echo "🎉 Boot initialization complete for $HOSTNAME."
