@@ -1,61 +1,21 @@
 #!/bin/bash
-
-# Only run this script if the hostname matches
 {{ if eq .chezmoi.hostname "arch-surface" -}}
-
 set -euo pipefail
 
-echo "🚀 Starting Surface Linux Automation (Refined Boot Order)..."
+echo "🚀 Setting up Surface Repository & Support Tools..."
 
-# 1. GPG & Repo Setup
+# 1. GPG Key Setup
 if ! pacman-key -list-keys 56C464BAAC421453 >/dev/null 2>&1; then
-    echo "📥 Importing Surface Linux GPG key..."
     curl -s https://raw.githubusercontent.com/linux-surface/linux-surface/master/pkg/keys/surface.asc | sudo pacman-key --add -
     sudo pacman-key --lsign-key 56C464BAAC421453
 fi
 
+# 2. Repo Setup
 if ! grep -q "\[linux-surface\]" /etc/pacman.conf; then
-    echo "📝 Adding [linux-surface] repository to /etc/pacman.conf..."
     echo -e "\n[linux-surface]\nServer = https://pkg.surfacelinux.com/arch/" | sudo tee -a /etc/pacman.conf
     sudo pacman -Sy
 fi
 
-# 2. Patch Limine Defaults BEFORE Installation
-LIMINE_DEFAULT="/etc/default/limine"
-TARGET_PARAMS="pci=hpiosize=0"
-
-if [ -f "$LIMINE_DEFAULT" ]; then
-    echo "⚡ Patching $LIMINE_DEFAULT for kernel parameters and default entry..."
-    
-    # Clean and Inject Kernel Parameters (Removed vt.global_cursor_default)
-    BASE_ARGS=$(sed 's/BOOT_IMAGE=[^ ]* //g; s/initrd=[^ ]* //g; s/pci=hpiosize=0//g' /proc/cmdline | xargs)
-    sudo sed -i '/^KERNEL_CMDLINE\[default\]=/d' "$LIMINE_DEFAULT"
-    echo "KERNEL_CMDLINE[default]=\"$BASE_ARGS $TARGET_PARAMS\"" | sudo tee -a "$LIMINE_DEFAULT" >/dev/null
-
-    # Force entry 1 as default. If linux-surface remains the second option, 
-    # you can manually change this to DEFAULT_ENTRY=2 here.
-    if grep -q "^DEFAULT_ENTRY=" "$LIMINE_DEFAULT"; then
-        sudo sed -i 's/^DEFAULT_ENTRY=.*/DEFAULT_ENTRY=1/' "$LIMINE_DEFAULT"
-    else
-        echo "DEFAULT_ENTRY=1" | sudo tee -a "$LIMINE_DEFAULT" >/dev/null
-    fi
-fi
-
-# 3. Installation
-# Installs kernel and the hook that generates the final limine.conf
-echo "📦 Installing Surface Kernel and Automation Tools..."
-yay -S --needed --noconfirm linux-surface linux-surface-headers iptsd linux-firmware-intel limine-mkinitcpio-hook
-
-# 4. Final Regeneration
-echo "🛠  Regenerating Limine config..."
-# This will pick up the DEFAULT_ENTRY=1 and TARGET_PARAMS from step 2
-sudo limine-mkinitcpio
-
-# 5. Hardware Sync
-sudo systemctl daemon-reload
-sudo udevadm control --reload-rules && sudo udevadm trigger
-sudo timedatectl set-local-rtc 1 --adjust-system-clock
-
-echo "🎉 Setup complete! Reboot to verify that linux-surface is the default."
-
+# 3. Install Support Tools ONLY (No Kernel)
+yay -S --needed --noconfirm iptsd linux-firmware-intel limine-mkinitcpio-hook
 {{ end -}}

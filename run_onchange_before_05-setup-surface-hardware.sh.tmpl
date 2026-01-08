@@ -6,11 +6,8 @@ set -euo pipefail
 echo "💻 Starting Surface Hardware Setup..."
 
 # --- 1. Kernel 6.15.3 Pinning Logic ---
-# This matches 'uname -r' exactly
 UNAME_VER="6.15.3-arch1-1-surface" 
-# This matches the GitHub filename exactly
 FILE_VER="6.15.3.arch1-1"
-
 RELEASE_TAG="arch-6.15.3-1"
 BASE_URL="https://github.com/linux-surface/linux-surface/releases/download/$RELEASE_TAG"
 
@@ -18,8 +15,6 @@ if [[ "$(uname -r)" != *"$UNAME_VER"* ]]; then
     echo "📥 Downloading Kernel $FILE_VER from GitHub..."
     KERNEL_DIR=$(mktemp -d)
     cd "$KERNEL_DIR"
-    
-    # Use FILE_VER here so the URL is correct
     curl -fLO "$BASE_URL/linux-surface-$FILE_VER-x86_64.pkg.tar.zst"
     curl -fLO "$BASE_URL/linux-surface-headers-$FILE_VER-x86_64.pkg.tar.zst"
     
@@ -31,12 +26,14 @@ else
 fi
 
 # --- 2. Lock kernel in pacman.conf ---
+# Note: Since the metapackages are removed, this prevents accidental re-installs
 echo "🔒 Ensuring linux-surface is locked in /etc/pacman.conf..."
 if ! grep -q "^IgnorePkg = linux-surface linux-surface-headers" /etc/pacman.conf; then
     sudo sed -i '/^IgnorePkg =/d' /etc/pacman.conf
     sudo sed -i 's/^#\s*IgnorePkg\s*=.*/IgnorePkg = linux-surface linux-surface-headers/' /etc/pacman.conf
 fi
-# --- 3. Create Multitouch Autodev Script ---
+
+# --- 3. Multitouch Autodev Script ---
 echo "👆 Creating iptsd-autodev helper..."
 sudo mkdir -p /usr/local/bin
 cat <<'EOF' | sudo tee /usr/local/bin/iptsd-autodev > /dev/null
@@ -61,7 +58,7 @@ exit 1
 EOF
 sudo chmod +x /usr/local/bin/iptsd-autodev
 
-# --- 4. Create Custom iptsd Service ---
+# --- 4. Custom iptsd Service ---
 echo "⚙️ Configuring custom iptsd service..."
 cat <<EOF | sudo tee /etc/systemd/system/iptsd.service > /dev/null
 [Unit]
