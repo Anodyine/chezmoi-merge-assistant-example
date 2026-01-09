@@ -100,8 +100,8 @@ fi
 sudo limine-mkinitcpio
 
 {{ if eq .chezmoi.hostname "arch-surface" -}}
-echo "🔧 Forcing Timeout to 0 to fix freeze when my usb hubs are connected..."
-sudo sed -i 's/^#\?timeout:.*/timeout: 0/' /boot/limine.conf
+#echo "🔧 Forcing Timeout to 0 to fix freeze when my usb hubs are connected..."
+#sudo sed -i 's/^#\?timeout:.*/timeout: 0/' /boot/limine.conf
 {{ end -}}
 
 sudo systemctl daemon-reload
