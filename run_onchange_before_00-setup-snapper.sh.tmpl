@@ -69,15 +69,13 @@ sudo sed -i '/^KERNEL_CMDLINE/d' "$DEFAULT_CONF"
 
 {{ if eq .chezmoi.hostname "arch-surface" -}}
 # --- 6. Surface-Specific Configuration ---
-# We append the stability fixes to your existing working parameters
-SURFACE_ARGS="pci=hpiosize=0 pcie_aspm=off intel_iommu=on,igfx_off usb4_port_reset"
+SURFACE_ARGS="pci=hpiosize=0"
 echo "KERNEL_CMDLINE[default]=\"$CURRENT_CMDLINE $SURFACE_ARGS\"" | sudo tee -a "$DEFAULT_CONF" >/dev/null
 
 SURFACE_VARS=(
-    "TERMINAL_MODE=text"
-    "GRAPHICS=no"
-    "TIMEOUT=0"
-    "DEFAULT_ENTRY=3"
+    # Move linux-surface to the very beginning.
+    # The "*" captures the standard 'linux' kernel as the next option.
+    "BOOT_ORDER=\"linux-surface, *, *fallback, Snapshots\""
 )
 
 for var in "${SURFACE_VARS[@]}"; do
@@ -88,7 +86,6 @@ done
 
 {{ else -}}
 # --- 7. Standard Host Configuration ---
-# Just use the parameters the system is already working with
 echo "KERNEL_CMDLINE[default]=\"$CURRENT_CMDLINE\"" | sudo tee -a "$DEFAULT_CONF" >/dev/null
 sudo sed -i "/^TIMEOUT=/d" "$DEFAULT_CONF"
 echo "TIMEOUT=5" | sudo tee -a "$DEFAULT_CONF" > /dev/null
@@ -96,12 +93,17 @@ echo "TIMEOUT=5" | sudo tee -a "$DEFAULT_CONF" > /dev/null
 
 # --- 7. Finalize & Sync ---
 echo "⚙️ Regenerating bootloader and enabling services..."
-# Ensure the hook is in mkinitcpio.conf (RESTORED FROM OLD)
 if ! grep -q "btrfs-overlayfs" /etc/mkinitcpio.conf; then
     sudo sed -i "s/filesystems/filesystems btrfs-overlayfs/" /etc/mkinitcpio.conf
 fi
 
 sudo limine-mkinitcpio
+
+{{ if eq .chezmoi.hostname "arch-surface" -}}
+echo "🔧 Forcing Timeout to 0 to fix freeze when my usb hubs are connected..."
+sudo sed -i 's/^#\?timeout:.*/timeout: 0/' /boot/limine.conf
+{{ end -}}
+
 sudo systemctl daemon-reload
 sudo systemctl enable --now limine-snapper-sync.service
 sudo limine-snapper-sync
