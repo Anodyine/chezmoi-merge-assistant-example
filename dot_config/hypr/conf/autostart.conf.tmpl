@@ -22,9 +22,9 @@ exec-once = ~/.config/hypr/scripts/gtk.sh
 # Using hypridle to start hyprlock
 exec-once = hypridle
 
-#exec-once = ~/.config/hypr/conf/synology-drive-start.sh
-
+{{ if eq .chezmoi.hostname "ml-server" -}}
 exec-once = /usr/bin/openrgb --startminimized --profile test
+{{ end }}
 
 # Load cliphist history
 exec-once = wl-paste --watch cliphist store
@@ -39,3 +39,5 @@ exec-once = ~/.config/hypr/scripts/cleanup.sh
 exec = ~/.config/com.ml4w.hyprlandsettings/hyprctl.sh
 
 exec-once = systemctl --user start hyprland-session.target
+
+exec-once = ~/.config/hypr/conf/synology-drive-start.sh
