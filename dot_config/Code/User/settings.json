@@ -14,18 +14,6 @@
   "terminal.integrated.defaultProfile.linux": "zsh",
   "editor.cursorBlinking": "expand",
   "editor.cursorSmoothCaretAnimation": "on",
-  // "powermode.enabled": true,
-  // "powermode.presets": "magic",
-  // "powermode.combo.location": "off",
-  // "powermode.explosions.customExplosions": [
-  //   "https://user-images.githubusercontent.com/1379537/84605362-a8cd1380-ae6a-11ea-84c4-ca862ed37a01.gif"
-  // ],
-  // "powermode.explosions.size": 3,
-  // "powermode.explosions.frequency": 3,
-  // "powermode.explosions.offset": 0.1,
-  // "powermode.explosions.duration": 400,
-  // "powermode.combo.counterEnabled": "hide",
-  // "powermode.shake.enabled": false,
   "vscode_custom_css.imports": [
     "file:///home/anodyine/.vscode/extensions/brandonkirbyson.vscode-animations-2.0.7/dist/updateHandler.js"
   ],
@@ -43,5 +31,15 @@
   "terminal.explorerKind": "external",
   "workbench.iconTheme": "Monokai Pro (Filter Octagon) Icons",
   "python.analysis.typeCheckingMode": "standard",
-  "editor.fontSize": 16
+  "editor.fontSize": 16,
+  "files.associations": {
+    "*.tmpl": "gotmpl"
+  },
+  "gopls": {
+    "ui.semanticTokens": true,
+    "templateExtensions": ["tmpl", "gohtml"]
+  },
+  "[gotmpl]": {
+      "editor.semanticHighlighting.enabled": true
+  }
 }
