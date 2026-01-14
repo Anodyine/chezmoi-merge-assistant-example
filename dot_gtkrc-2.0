@@ -3,7 +3,7 @@
 
 include "/home/anodyine/.gtkrc-2.0.mine"
 gtk-theme-name="adw-gtk3-dark"
-gtk-icon-theme-name="Colloid-Purple-Dark"
+gtk-icon-theme-name="Colloid-Red-Dark"
 gtk-font-name="Cantarell 11"
 gtk-cursor-theme-name="ArcDusk-cursors"
 gtk-cursor-theme-size=24
