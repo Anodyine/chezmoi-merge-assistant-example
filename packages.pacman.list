@@ -152,3 +152,7 @@ guvcview
 chromium
 
 go
+
+# --- LaTeX & Document Prep ---
+texlive-meta
+texlive-binextra
