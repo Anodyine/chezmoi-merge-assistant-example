@@ -41,5 +41,6 @@
   },
   "[gotmpl]": {
       "editor.semanticHighlighting.enabled": true
-  }
+  },
+  "python.defaultInterpreterPath": "/sbin/python3.14"
 }

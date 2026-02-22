@@ -45,3 +45,5 @@ setopt appendhistory
 
 # Shipped Theme
 # eval "$(oh-my-posh init zsh --config /usr/share/oh-my-posh/themes/agnoster.omp.json)"
+#
+alias monitor-gpu='nvidia-smi -l 1'
