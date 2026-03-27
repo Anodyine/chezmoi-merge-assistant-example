@@ -19,179 +19,73 @@
         "btrfs_options": {
             "snapshot_config": null
         },
-        "config_type": "manual_partitioning",
-        "device_modifications": [
-            {
-                "device": "/dev/nvme0n1",
-                "partitions": [
-                    {
-                        "btrfs": [],
-                        "dev_path": "/dev/nvme0n1p1",
-                        "flags": [
-                            "boot",
-                            "esp"
-                        ],
-                        "fs_type": "fat32",
-                        "mount_options": [],
-                        "mountpoint": null,
-                        "obj_id": "35f0d850-d624-4de4-b1f9-59f715b7208b",
-                        "size": {
-                            "sector_size": {
-                                "unit": "B",
-                                "value": 512
-                            },
-                            "unit": "B",
-                            "value": 2147483648
-                        },
-                        "start": {
-                            "sector_size": {
-                                "unit": "B",
-                                "value": 512
-                            },
-                            "unit": "sectors",
-                            "value": 2048
-                        },
-                        "status": "delete",
-                        "type": "primary"
-                    },
-                    {
-                        "btrfs": [
-                            {
-                                "mountpoint": "None",
-                                "name": "@"
-                            },
-                            {
-                                "mountpoint": "None",
-                                "name": "@home"
-                            },
-                            {
-                                "mountpoint": "None",
-                                "name": "@log"
-                            },
-                            {
-                                "mountpoint": "None",
-                                "name": "@pkg"
-                            },
-                            {
-                                "mountpoint": "None",
-                                "name": "@snapshots"
-                            },
-                            {
-                                "mountpoint": "None",
-                                "name": "@/var/lib/portables"
-                            },
-                            {
-                                "mountpoint": "None",
-                                "name": "@/var/lib/machines"
-                            }
-                        ],
-                        "dev_path": "/dev/nvme0n1p2",
-                        "flags": [],
-                        "fs_type": "btrfs",
-                        "mount_options": [],
-                        "mountpoint": null,
-                        "obj_id": "f4089f35-c7dd-4dc4-8256-fc75198082ac",
-                        "size": {
-                            "sector_size": {
-                                "unit": "B",
-                                "value": 512
-                            },
-                            "unit": "B",
-                            "value": 1099511627776
-                        },
-                        "start": {
-                            "sector_size": {
-                                "unit": "B",
-                                "value": 512
-                            },
-                            "unit": "sectors",
-                            "value": 4196352
-                        },
-                        "status": "delete",
-                        "type": "primary"
-                    },
-                    {
-                        "btrfs": [],
-                        "dev_path": null,
-                        "flags": [
-                            "boot",
-                            "esp"
-                        ],
-                        "fs_type": "fat32",
-                        "mount_options": [],
-                        "mountpoint": "/boot/efi",
-                        "obj_id": "b857ca8e-0e37-4e88-8e84-b54ca24053b8",
-                        "size": {
-                            "sector_size": {
-                                "unit": "B",
-                                "value": 512
-                            },
-                            "unit": "GiB",
-                            "value": 2
-                        },
-                        "start": {
-                            "sector_size": {
-                                "unit": "B",
-                                "value": 512
-                            },
-                            "unit": "MiB",
-                            "value": 1
-                        },
-                        "status": "create",
-                        "type": "primary"
-                    },
-                    {
-                        "btrfs": [
-                            {
-                                "mountpoint": "/",
-                                "name": "@"
-                            },
-                            {
-                                "mountpoint": "/home",
-                                "name": "@home"
-                            },
-                            {
-                                "mountpoint": "/.snapshots",
-                                "name": "@snapshots"
-                            },
-                            {
-                                "mountpoint": "/var/log",
-                                "name": "@log"
-                            },
-                            {
-                                "mountpoint": "/var/cache/pacman/pkg",
-                                "name": "@pkg"
-                            }
-                        ],
-                        "dev_path": null,
-                        "flags": [],
-                        "fs_type": "btrfs",
-                        "mount_options": [],
-                        "mountpoint": null,
-                        "obj_id": "4e2591f0-9d0c-4e15-b775-dc7d7abdf6b2",
-                        "size": {
-                            "sector_size": {
-                                "unit": "B",
-                                "value": 512
-                            },
-                            "unit": "TiB",
-                            "value": 1
-                        },
-                        "start": {
-                            "sector_size": {
-                                "unit": "B",
-                                "value": 512
-                            },
-                            "unit": "B",
-                            "value": 2148532224
-                        },
-                        "status": "create",
-                        "type": "primary"
-                    }
-                ],
-                "wipe": false
-            }
-        ]
+        "config_type": "manual_partitioning",   
+"device_modifications": [
+  {
+    "device": "/dev/nvme0n1",
+    "wipe": false,
+    "partitions": [
+      {
+        "status": "create",
+        "type": "primary",
+        "fs_type": "fat32",
+        "flags": ["boot", "esp"],
+        "mountpoint": "/boot",
+        "mount_options": [],
+        "btrfs": [],
+        "dev_path": null,
+        "start": {
+          "unit": "MiB",
+          "value": 1,
+          "sector_size": {
+            "unit": "B",
+            "value": 512
+          }
+        },
+        "size": {
+          "unit": "GiB",
+          "value": 10,
+          "sector_size": {
+            "unit": "B",
+            "value": 512
+          }
+        }
+      },
+      {
+        "status": "create",
+        "type": "primary",
+        "fs_type": "btrfs",
+        "flags": [],
+        "mountpoint": null,
+        "mount_options": [],
+        "dev_path": null,
+        "btrfs": [
+          { "name": "@", "mountpoint": "/" },
+          { "name": "@home", "mountpoint": "/home" },
+          { "name": "@snapshots", "mountpoint": "/.snapshots" },
+          { "name": "@log", "mountpoint": "/var/log" },
+          { "name": "@pkg", "mountpoint": "/var/cache/pacman/pkg" }
+        ],
+        "start": {
+          "unit": "GiB",
+          "value": 10,
+          "sector_size": {
+            "unit": "B",
+            "value": 512
+          }
+        },
+        "size": {
+          "unit": "percent",
+          "value": 100,
+          "sector_size": {
+            "unit": "B",
+            "value": 512
+          }
+        }
+      }
+    ]
+  }
+]
     },
     "hostname": "ml-server-2",
     "kernels": [
